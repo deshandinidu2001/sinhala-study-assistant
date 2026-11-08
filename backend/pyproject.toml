@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sinhala-study-assistant-backend"
+version = "0.1.0"
+description = "A document-grounded Sinhala study assistant"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "fastapi>=0.115,<1",
+    "uvicorn[standard]>=0.34,<1",
+    "SQLAlchemy>=2.0.38,<2.1",
+    "alembic>=1.14,<2",
+    "pydantic>=2.10,<3",
+    "pydantic-settings>=2.7,<3",
+    "psycopg[binary]>=3.2,<4",
+    "pgvector>=0.3.6,<1",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.3,<10", "httpx>=0.28,<1"]
+
+[tool.setuptools]
+packages = ["backend", "backend.db"]
+package-dir = {"backend" = "."}
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = ["integration: requires a disposable PostgreSQL database with pgvector"]

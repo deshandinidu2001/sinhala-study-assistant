@@ -1,0 +1,1 @@
+"""Sinhala study assistant API."""
