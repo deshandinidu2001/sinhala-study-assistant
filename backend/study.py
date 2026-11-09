@@ -1,0 +1,291 @@
+"""Local document extraction, lexical retrieval, and source-based practice.
+
+No external model or API is required. Hash vectors are a local lexical index,
+not BGE-M3 semantic embeddings. Answers quote the actual source text.
+"""
+import hashlib
+import io
+import json
+import logging
+import math
+import random
+import re
+import subprocess
+import unicodedata
+import warnings
+import zipfile
+from collections import Counter
+from pathlib import Path
+from uuid import UUID
+
+from PIL import Image, ImageOps
+from pypdf import PdfReader
+from sqlalchemy import delete, select
+from sqlalchemy.orm import Session
+
+from backend.config import get_settings
+from backend.db.models import Chunk, Document
+from backend.db.session import get_engine
+
+logger = logging.getLogger(__name__)
+EXTENSIONS = {".pdf", ".txt", ".md", ".docx", ".png", ".jpg", ".jpeg", ".webp"}
+MAX_PAGES = 150
+MAX_CHARACTERS = 1_000_000
+Image.MAX_IMAGE_PIXELS = 25_000_000
+STOP_WORDS = set("what is are the a an of in to and how why explain please about does do for with යනු කුමක්ද කුමක් මොකක්ද කියන්නේ කුමන මොනවාද මොනවද පැහැදිලි කරන්න ගැන පිළිබඳ කියන්න දෙන්න සහ හා ද වේ ය ඒ මේ එය ලියන්න කෙසේද ඇයි වන්නේ".split())
+
+
+class StudyError(ValueError):
+    pass
+
+
+def normalize(value: str) -> str:
+    # Preserve Sinhala conjunct ZWJ only when preceded by the virama.
+    value = unicodedata.normalize("NFC", value).replace("\x00", "").replace("\u200b", "").replace("\ufeff", "")
+    value = re.sub(r"(?<!\u0dca)\u200d", "", value).replace("\u200c", "")
+    return re.sub(r"[ \t]+", " ", value).strip()
+
+
+def words(value: str) -> list[str]:
+    clean = "".join(c if unicodedata.category(c)[0] in "LMN" or c == "\u200d" else " " for c in normalize(value).casefold())
+    return [word for word in clean.split() if len(word) > 1 and word not in STOP_WORDS]
+
+
+def vector(value: str) -> list[float]:
+    result = [0.0] * 1024
+    for word, count in Counter(w.replace("\u200d", "") for w in words(value)).items():
+        features = [word] + [word[i:i + 3] for i in range(max(0, len(word) - 2))]
+        for feature in features:
+            digest = hashlib.blake2b(feature.encode("utf-8"), digest_size=4).digest()
+            result[int.from_bytes(digest, "little") % 1024] += math.log1p(count)
+    length = math.sqrt(sum(x * x for x in result)) or 1
+    return [x / length for x in result]
+
+
+def document_folder(document_id: UUID) -> Path:
+    return get_settings().storage_path / str(document_id)
+
+
+def source_path(document: Document) -> Path:
+    return document_folder(document.id) / ("original" + Path(document.filename).suffix.lower())
+
+
+def ocr(image: Image.Image) -> str:
+    image = ImageOps.exif_transpose(image).convert("RGB")
+    image.thumbnail((3600, 3600))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    try:
+        completed = subprocess.run(
+            ["tesseract", "stdin", "stdout", "-l", "sin+eng", "--psm", "3"],
+            input=buffer.getvalue(), capture_output=True, timeout=90, check=True,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError) as error:
+        raise StudyError("රූපයේ අකුරු කියවීමට නොහැකි විය. පැහැදිලි රූපයක් හෝ අකුරු සහිත PDF ලේඛනයක් භාවිත කරන්න.") from error
+    return normalize(completed.stdout.decode("utf-8", errors="replace"))
+
+
+def extract_pages(path: Path) -> tuple[list[dict], str]:
+    extension = path.suffix.lower()
+    method = "text"
+    pages: list[dict] = []
+    if extension == ".pdf":
+        reader = PdfReader(path)
+        if reader.is_encrypted and not reader.decrypt(""):
+            raise StudyError("මෙම PDF ලේඛනය මුරපදයකින් ආරක්ෂිතයි. මුරපදය ඉවත් කර නැවත එක් කරන්න.")
+        if not 0 < len(reader.pages) <= MAX_PAGES:
+            raise StudyError(f"වරකට පිටු {MAX_PAGES} දක්වා ඇති PDF ලේඛනයක් එක් කරන්න.")
+        rendered = None
+        try:
+            total = 0
+            for number, page in enumerate(reader.pages, 1):
+                text = normalize(page.extract_text() or "")
+                used_ocr = False
+                # Empty/scanned pages and visibly corrupt legacy encodings need OCR.
+                if len(words(text)) < 4 or text.count("\ufffd") > 3:
+                    import pypdfium2 as pdfium
+                    if rendered is None:
+                        rendered = pdfium.PdfDocument(path)
+                    pdf_page = rendered[number - 1]
+                    try:
+                        width, height = pdf_page.get_size()
+                        bitmap = pdf_page.render(scale=min(2.5, 3600 / max(width, height)))
+                        try:
+                            text = ocr(bitmap.to_pil())
+                        finally:
+                            bitmap.close()
+                    finally:
+                        pdf_page.close()
+                    used_ocr = True
+                    method = "text+ocr"
+                total += len(text)
+                if total > MAX_CHARACTERS:
+                    raise StudyError("ලේඛනයේ අකුරු ප්‍රමාණය වැඩියි. කුඩා කොටස්වලට බෙදා එක් කරන්න.")
+                pages.append({"page": number, "text": text, "ocr": used_ocr})
+        finally:
+            if rendered is not None:
+                rendered.close()
+    elif extension in {".txt", ".md"}:
+        try:
+            raw = path.read_bytes()
+            text = raw.decode("utf-16" if raw.startswith((b"\xff\xfe", b"\xfe\xff")) else "utf-8-sig")
+        except UnicodeError as error:
+            raise StudyError("මෙම ලිපිය UTF-8 හෝ UTF-16 ලෙස සුරැකීමෙන් පසු නැවත එක් කරන්න.") from error
+        # Form feeds preserve explicit page boundaries; otherwise use labelled sections.
+        sections = text.split("\f") if "\f" in text else [text[i:i + 5000] for i in range(0, len(text), 5000)]
+        pages = [{"page": i + 1, "text": normalize(part), "ocr": False} for i, part in enumerate(sections)]
+    elif extension == ".docx":
+        from docx import Document as WordDocument
+        with zipfile.ZipFile(path) as archive:
+            if sum(entry.file_size for entry in archive.infolist()) > 50_000_000:
+                raise StudyError("මෙම Word ලේඛනය ඉතා විශාලයි. කුඩා කොටස්වලට බෙදන්න.")
+        document = WordDocument(path)
+        text = "\n".join([p.text for p in document.paragraphs] + [" | ".join(cell.text for cell in row.cells) for table in document.tables for row in table.rows])
+        pages = [{"page": i // 5000 + 1, "text": normalize(text[i:i + 5000]), "ocr": False} for i in range(0, len(text), 5000)]
+        method = "sections"
+    elif extension in {".png", ".jpg", ".jpeg", ".webp"}:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(path) as image:
+                pages = [{"page": 1, "text": ocr(image), "ocr": True}]
+        method = "ocr"
+    else:
+        raise StudyError("PDF, TXT, MD, DOCX හෝ රූපයක් එක් කරන්න.")
+    if len(pages) > MAX_PAGES or sum(len(p["text"]) for p in pages) > MAX_CHARACTERS:
+        raise StudyError("ලේඛනය ඉතා විශාලයි. කුඩා කොටස්වලට බෙදා එක් කරන්න.")
+    if not any(len(words(p["text"])) >= 3 for p in pages):
+        raise StudyError("කියවිය හැකි අකුරු හමු නොවීය. පැහැදිලි ලේඛනයක් හෝ සටහනක අකුරු එක් කරන්න.")
+    return pages, method
+
+
+def chunks(text: str, maximum: int = 1400) -> list[str]:
+    # Keep source pages separate, and prefer whole sentences with one-sentence overlap.
+    sentences = re.split(r"(?<=[.!?।])\s+|\n+", text)
+    result: list[str] = []
+    current = ""
+    for sentence in sentences:
+        for offset in range(0, len(sentence), maximum):
+            piece = sentence[offset:offset + maximum].strip()
+            if not piece:
+                continue
+            if len(current) + len(piece) > maximum and current:
+                result.append(current)
+                tail = re.split(r"(?<=[.!?।])\s+", current)[-1]
+                current = tail if len(tail) < 300 else ""
+            current = (current + " " + piece).strip()
+    if current:
+        result.append(current)
+    return result
+
+
+def ingest(document_id: UUID) -> None:
+    try:
+        with Session(get_engine()) as db:
+            document = db.get(Document, document_id)
+            if document is None or document.status not in {"pending", "processing"}:
+                return
+            document.status = "processing"
+            document.error = None
+            path = source_path(document)
+            db.commit()
+        pages, method = extract_pages(path)
+        with Session(get_engine()) as db:
+            document = db.scalar(select(Document).where(Document.id == document_id).with_for_update())
+            if document is None:
+                return
+            db.execute(delete(Chunk).where(Chunk.document_id == document_id))
+            for page in pages:
+                for index, content in enumerate(chunks(page["text"])):
+                    if not words(content):
+                        continue
+                    db.add(Chunk(document_id=document_id, page=page["page"], chunk_index=index, text=content, embedding=vector(content), token_count=max(1, len(content.split()))))
+            folder = document_folder(document_id)
+            temporary = folder / "pages.tmp"
+            temporary.write_text(json.dumps(pages, ensure_ascii=False), encoding="utf-8")
+            temporary.replace(folder / "pages.json")
+            document.page_count = len(pages)
+            document.extraction_method = method
+            document.status = "ready"
+            db.commit()
+    except Exception as error:
+        message = str(error) if isinstance(error, StudyError) else "ලේඛනය කියවීමට නොහැකි විය. ගොනුව නිවැරදිදැයි බලා නැවත උත්සාහ කරන්න."
+        logger.warning("Document ingestion failed: %s (%s)", document_id, type(error).__name__)
+        with Session(get_engine()) as db:
+            document = db.get(Document, document_id)
+            if document is not None:
+                document.status = "failed"
+                document.error = message
+                db.commit()
+
+
+def relevance(question: str, passage: str) -> float:
+    query = {word.replace("\u200d", "") for word in words(question)}
+    terms = {word.replace("\u200d", "") for word in words(passage)}
+    if not query or not terms:
+        return 0
+    matched = sum(any(q == t or (min(len(q), len(t)) >= 4 and (q.startswith(t) or t.startswith(q))) for t in terms) for q in query)
+    return matched / len(query)
+
+
+def retrieve(db: Session, question: str, subject: str | None = None, document_id: UUID | None = None) -> list[dict]:
+    query = select(Chunk, Document).join(Document).where(Document.status == "ready")
+    if subject:
+        query = query.where(Document.subject == subject)
+    if document_id:
+        query = query.where(Document.id == document_id)
+    candidates = db.execute(query.order_by(Chunk.embedding.cosine_distance(vector(question))).limit(80)).all()
+    ranked = sorted(candidates, key=lambda row: relevance(question, row[0].text), reverse=True)
+    sources = []
+    seen = set()
+    for chunk, document in ranked:
+        score = relevance(question, chunk.text)
+        if score < 0.3 or (document.id, chunk.page) in seen:
+            continue
+        seen.add((document.id, chunk.page))
+        sentences = re.split(r"(?<=[.!?।])\s+|\n+", chunk.text)
+        best = sorted(enumerate(sentences), key=lambda pair: relevance(question, pair[1]), reverse=True)[:3]
+        excerpt = " ".join(sentence for _, sentence in sorted(best))[:1100]
+        sources.append({"document_id": str(document.id), "title": document.title, "filename": document.filename, "page": chunk.page, "excerpt": excerpt, "ocr": document.extraction_method in {"ocr", "text+ocr"}, "section": document.extraction_method == "sections" or Path(document.filename).suffix.lower() in {".txt", ".md"}})
+        if len(sources) == 3:
+            break
+    return sources
+
+
+def make_quiz(db: Session, subject: str | None, document_id: UUID | None, count: int = 5) -> list[dict]:
+    query = select(Chunk, Document).join(Document).where(Document.status == "ready")
+    if subject:
+        query = query.where(Document.subject == subject)
+    if document_id:
+        query = query.where(Document.id == document_id)
+    rows = db.execute(query.limit(1000)).all()
+    rng = random.SystemRandom()
+    candidates = []
+    vocabulary = set()
+    for chunk, document in rows:
+        vocabulary.update(w for w in words(chunk.text) if len(w) >= 4)
+        for sentence in re.split(r"(?<=[.!?।])\s+|\n+", chunk.text):
+            if 30 <= len(sentence) <= 500 and len(words(sentence)) >= 5:
+                candidates.append((sentence, chunk, document))
+    rng.shuffle(candidates)
+    result = []
+    seen = set()
+    for sentence, chunk, document in candidates:
+        if sentence in seen:
+            continue
+        choices = [w for w in words(sentence) if len(w) >= 4 and w in sentence.casefold()]
+        if not choices:
+            continue
+        answer = rng.choice(choices)
+        distractors = sorted(w for w in vocabulary if w != answer and w not in sentence.casefold())
+        if len(distractors) < 3:
+            continue
+        options = [answer] + rng.sample(distractors, 3)
+        rng.shuffle(options)
+        prompt = re.sub(re.escape(answer), "________", sentence, count=1, flags=re.IGNORECASE)
+        result.append({"prompt": "හිස්තැනට සුදුසු වචනය තෝරන්න.\n" + prompt, "options": options, "answer_index": options.index(answer), "explanation": sentence, "source": {"document_id": str(document.id), "title": document.title, "page": chunk.page, "section": document.extraction_method == "sections" or Path(document.filename).suffix.lower() in {".txt", ".md"}}})
+        seen.add(sentence)
+        if len(result) == count:
+            break
+    if not result:
+        raise StudyError("ප්‍රශ්න සෑදීමට ප්‍රමාණවත් සම්පූර්ණ වාක්‍ය නැත. වඩා දිගු පාඩම් සටහනක් එක් කරන්න.")
+    return result

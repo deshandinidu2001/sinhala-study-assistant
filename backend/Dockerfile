@@ -1,6 +1,9 @@
 FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 WORKDIR /app
+RUN --mount=type=secret,id=build_ca \
+    if [ -f /run/secrets/build_ca ]; then export SSL_CERT_FILE=/run/secrets/build_ca; fi; \
+    apt-get update && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-sin tesseract-ocr-eng && rm -rf /var/lib/apt/lists/*
 COPY backend/requirements.lock /tmp/requirements.lock
 RUN --mount=type=secret,id=build_ca \
     if [ -f /run/secrets/build_ca ]; then export PIP_CERT=/run/secrets/build_ca; fi; \

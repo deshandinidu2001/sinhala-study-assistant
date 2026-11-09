@@ -2,9 +2,17 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import { Icon } from "@/components/icon";
+import Link from "next/link";
+import { useEffect } from "react";
+import { useDocuments } from "@/lib/use-documents";
 
 export function StudyOverview() {
   const reduceMotion = useReducedMotion();
+  const { documents, loading, error } = useDocuments();
+  useEffect(() => {
+    if (window.location.hash === "#practice") window.location.replace("/practice");
+    else if (window.location.hash === "#library") window.location.replace("/documents");
+  }, []);
   return (
     <div className="overview">
       <section className="page-intro" aria-labelledby="welcome-heading">
@@ -18,7 +26,7 @@ export function StudyOverview() {
           <span className="hero-kicker"><span className="tiny-book"><Icon name="book" size={16} /></span>ඔබේ පාඩමට ළඟින්ම</span>
           <h2 id="hero-heading">දැනුම ගොඩනගන්න.<br />විශ්වාසයෙන් ඉදිරියට යන්න.</h2>
           <p>සටහනක් කියවන්න. ප්‍රශ්නයක් අහන්න.<br />පිළිතුර හමු වූ පිටුවත් සමඟම තේරුම් ගන්න.</p>
-          <a className="primary-button" href="#study-method">ඉගෙන ගන්නා ආකාරය<Icon name="arrow" size={18} /></a>
+          <div className="hero-actions"><Link className="primary-button" href="/documents">ලේඛනයක් එක් කරන්න<Icon name="arrow" size={18} /></Link><a className="text-button" href="#study-method">ඉගෙන ගන්නා ආකාරය</a></div>
         </div>
         <div className="study-art" role="img" aria-label="සිංහල සටහන් පොතක් සහ ප්‍රශ්න පත්‍රයක්">
           <div className="art-orbit" />
@@ -41,7 +49,8 @@ export function StudyOverview() {
       <div className="lower-grid">
         <section id="library" className="library-panel" aria-labelledby="library-heading">
           <div className="section-heading"><h2 id="library-heading">ඔබේ ලේඛන එකතුව</h2><Icon name="book" size={20} /></div>
-          <div className="library-empty"><span className="empty-illustration"><Icon name="document" size={31} /><span>+</span></span><h3>අලුත් පාඩමකට ඉඩක්</h3><p>ඔබේ සටහන් සහ ප්‍රශ්න පත්‍ර සඳහා<br />වෙන් වූ අධ්‍යයන අවකාශය.</p></div>
+          {error && <p className="notice error" role="alert">{error}</p>}
+          {loading ? <p className="empty-state" role="status">ලේඛන ලබාගනිමින්…</p> : documents.length ? <div className="recent-documents">{documents.slice(0, 3).map(d => <Link key={d.id} href={d.status === "ready" ? `/documents/${d.id}` : "/documents"}><Icon name="document" size={20} /><span><strong>{d.title}</strong><small>{d.subject} · {d.status === "ready" ? `${d.page_count} ${/\.(txt|md|docx)$/i.test(d.filename) ? "කොටස්" : "පිටු"}` : d.status === "failed" ? "සැකසීම අසාර්ථකයි" : "සකසමින්…"}</small></span></Link>)}<Link className="text-button" href="/documents">සියලු ලේඛන බලන්න ({documents.length})</Link></div> : <div className="library-empty"><span className="empty-illustration"><Icon name="document" size={31} /><span>+</span></span><h3>අලුත් පාඩමකට ඉඩක්</h3><p>ඔබේ සටහන් සහ ප්‍රශ්න පත්‍ර සඳහා<br />වෙන් වූ අධ්‍යයන අවකාශය.</p><Link className="secondary-button" href="/documents">පළමු ලේඛනය එක් කරන්න</Link></div>}
           <p className="library-footnote"><Icon name="check" size={15} />පිළිතුරු ඔබේ ලේඛන ඇසුරින් පමණයි</p>
         </section>
         <section id="practice" className="practice-panel" aria-labelledby="practice-heading">
@@ -49,6 +58,7 @@ export function StudyOverview() {
           <h2 id="practice-heading">කියවූ දේ මතකද?</h2>
           <p>පාඩම අවසානයේ ප්‍රශ්න පුහුණුවෙන් ඔබේ අවබෝධය පරීක්ෂා කරගන්න.</p>
           <div className="practice-detail"><span><Icon name="check" size={16} />බහුවරණ ප්‍රශ්න</span><span><Icon name="check" size={16} />පැහැදිලි කිරීම් සහ මූලාශ්‍ර</span></div>
+          <Link className="secondary-button" href="/practice">ප්‍රශ්න පුහුණුවට යන්න<Icon name="arrow" size={16} /></Link>
           <p className="practice-note">ඔබේ සටහන්, ඔබේ පුහුණුවේ පදනමයි.</p>
         </section>
       </div>

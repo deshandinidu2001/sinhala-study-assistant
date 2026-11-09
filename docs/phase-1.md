@@ -1,5 +1,7 @@
 # Phase 1: foundation
 
+Historical foundation record. The working upload, reader, source-answer, and practice implementation is documented in [workflow verification](workflows.md).
+
 Date: 2026-11-08 (Asia/Colombo).
 
 **Implementation and automated checks pass. The phase is not fully accepted: visual browser verification is blocked by unavailable browser/native UI services. Phase 2 has not started.**

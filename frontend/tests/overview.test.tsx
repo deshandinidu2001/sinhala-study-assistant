@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { StudyOverview } from "@/components/study-overview";
+vi.mock("@/lib/use-documents", () => ({ useDocuments: () => ({ documents: [], loading: false, error: "" }) }));
 
 vi.mock("framer-motion", () => ({
   useReducedMotion: () => true,
@@ -15,5 +16,7 @@ describe("Sinhala study overview", () => {
     expect(guide).toHaveAttribute("href", "#study-method");
     expect(document.querySelector(guide.getAttribute("href")!)).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "ඔබේ ලේඛන එකතුව" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "ලේඛනයක් එක් කරන්න" })).toHaveAttribute("href", "/documents");
+    expect(screen.getByRole("link", { name: "ප්‍රශ්න පුහුණුවට යන්න" })).toHaveAttribute("href", "/practice");
   });
 });
