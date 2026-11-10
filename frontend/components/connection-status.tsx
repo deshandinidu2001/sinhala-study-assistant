@@ -1,9 +1,11 @@
 "use client";
 
+import { useLanguage } from "@/lib/language";
 import { useEffect, useState } from "react";
 import { getHealth } from "@/lib/api";
 
 export function ConnectionStatus() {
+  const { t } = useLanguage();
   const [status, setStatus] = useState<"checking" | "online" | "offline">("checking");
   const [attempt, setAttempt] = useState(0);
 
@@ -22,8 +24,8 @@ export function ConnectionStatus() {
   const label = { checking: "සම්බන්ධ වෙමින්", online: "සේවාව සූදානම්", offline: "සම්බන්ධතාව නැත" }[status];
   return (
     <div className="connection" data-status={status}>
-      <div role="status"><span className="status-dot" />{label}</div>
-      {status === "offline" && <button onClick={() => setAttempt((value) => value + 1)}>නැවත උත්සාහ කරන්න</button>}
+      <div role="status"><span className="status-dot" />{t(label, { checking: "Connecting", online: "Ready", offline: "Offline" }[status])}</div>
+      {status === "offline" && <button onClick={() => setAttempt((value) => value + 1)}>{t("නැවත උත්සාහ කරන්න")}</button>}
     </div>
   );
 }

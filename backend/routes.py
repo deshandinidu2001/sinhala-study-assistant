@@ -171,6 +171,7 @@ def delete_document(document_id: UUID, db: DB) -> None:
 
 
 class QuestionInput(BaseModel):
+    answer_language: Literal["si", "en"] = "si"
     language: Literal["auto", "singlish", "original"] = "auto"
     question: str = Field(min_length=2, max_length=2000)
     subject: str | None = Field(default=None, max_length=120)
@@ -232,13 +233,15 @@ def ask_question(body: QuestionInput, db: DB) -> dict:
     question, normalization, notice = gemini.interpret(body.question, body.language, question_vocabulary(db, body))
     sources = retrieve(db, question, body.subject, body.document_id)
     if sources:
-        answer = "ඔබේ ලේඛනවලින් හමු වූ අදාළ කොටස්:\n\n" + "\n\n".join(f"{source['excerpt']} [{i}]" for i, source in enumerate(sources, 1))
+        answer = ("Relevant passages from your sources:\n\n" if body.answer_language == "en" else "ඔබේ ලේඛනවලින් හමු වූ අදාළ කොටස්:\n\n") + "\n\n".join(f"{source['excerpt']} [{i}]" for i, source in enumerate(sources, 1))
     else:
         answer = "ඔබේ ලේඛනවල මෙම ප්‍රශ්නයට අදාළ තොරතුරු හමු නොවීය. අදාළ පාඩම එක් කරන්න හෝ ලේඛනයේ ඇති ප්‍රධාන වචන භාවිත කර ප්‍රශ්නය නැවත අසන්න."
+    if not sources and body.answer_language == "en":
+        answer = "No matching passages. Try a key term from your notes or choose another source."
     mode = "extractive" if sources else "no_match"
     if sources and gemini.configured():
         try:
-            explanation = gemini.explain(question, sources)
+            explanation = gemini.explain(question, sources, body.answer_language)
             if explanation:
                 answer, mode = explanation, "gemini"
             else:

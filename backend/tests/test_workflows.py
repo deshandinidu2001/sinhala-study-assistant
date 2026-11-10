@@ -215,7 +215,7 @@ def test_gemini_provenance_scope_and_failure_fallback(client: TestClient, monkey
     note = client.post("/documents/text", json={"title": "හරිතප්‍රද", "subject": "විද්‍යාව", "content": NOTE}).json()
     assert wait_document(client, note["id"])["status"] == "ready"
     monkeypatch.setattr(gemini, "configured", lambda: True)
-    monkeypatch.setattr(gemini, "explain", lambda question, sources: "හරිත ශාක ආහාර නිපදවයි. [1]")
+    monkeypatch.setattr(gemini, "explain", lambda question, sources, language="si": "හරිත ශාක ආහාර නිපදවයි. [1]")
     request = {"question": "ප්‍රභාසංස්ලේෂණය යනු කුමක්ද?", "document_id": note["id"]}
     chat = client.post("/chat", json=request).json()
     assert chat["mode"] == "gemini"

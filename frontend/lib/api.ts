@@ -1,3 +1,5 @@
+import { translate } from "@/lib/translations";
+
 export type Health = { status: "ok"; database: "ok" };
 
 export class ApiError extends Error {
@@ -35,7 +37,9 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   }
   if (!response.ok) {
     const data = await response.json().catch(() => null);
-    throw new ApiError(response.status, typeof data?.detail === "string" ? data.detail : "ඉල්ලීම සම්පූර්ණ කළ නොහැක. නැවත උත්සාහ කරන්න.");
+    let detail = typeof data?.detail === "string" ? data.detail : "ඉල්ලීම සම්පූර්ණ කළ නොහැක. නැවත උත්සාහ කරන්න.";
+    try { if (localStorage.getItem("akura-language") === "en") detail = translate(detail); } catch { /* Storage is optional. */ }
+    throw new ApiError(response.status, detail);
   }
   return response.status === 204 ? undefined as T : response.json() as Promise<T>;
 }
