@@ -7,11 +7,12 @@ from typing import Annotated
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from backend.pdf_pages import render_page
 from backend.config import get_settings
 from backend.db.models import Chat, Document, Quiz
 from backend.db.session import get_db
@@ -112,6 +113,36 @@ def get_original(document_id: UUID, db: DB) -> FileResponse:
     if not path.is_file():
         raise HTTPException(404, "මුල් ගොනුව හමු නොවීය. ලේඛනය නැවත එක් කරන්න.")
     return FileResponse(path, filename=document.filename, content_disposition_type="inline", headers={"X-Content-Type-Options": "nosniff"})
+
+
+@router.get("/documents/{document_id}/pages/{number}/image")
+def get_page_image(document_id: UUID, number: int, db: DB) -> Response:
+    document = require_document(db, document_id)
+    if Path(document.filename).suffix.lower() != ".pdf":
+        raise HTTPException(415, "මෙම ලේඛනය PDF ගොනුවක් නොවේ.")
+    if not source_path(document).is_file():
+        raise HTTPException(404, "මුල් ගොනුව හමු නොවීය.")
+    try:
+        content = render_page(source_path(document), number)
+    except IndexError:
+        raise HTTPException(404, "පිටුව හමු නොවීය.")
+    except Exception:
+        raise HTTPException(422, "PDF පිටුව පෙන්විය නොහැක. මුල් ගොනුව විවෘත කරන්න.")
+    return Response(content, media_type="image/png", headers={"Cache-Control": "private, max-age=3600"})
+
+
+@router.post("/documents/{document_id}/reprocess", status_code=202)
+def reprocess_document(document_id: UUID, request: Request, db: DB) -> dict:
+    document = db.scalar(select(Document).where(Document.id == document_id).with_for_update())
+    if document is None:
+        raise HTTPException(404, "ලේඛනය හමු නොවීය.")
+    if document.status not in {"ready", "failed"}:
+        raise HTTPException(409, "ලේඛනය දැනටමත් සකසමින් පවතී.")
+    document.status = "pending"
+    document.error = None
+    db.commit()
+    request.app.state.ingestion.submit(ingest, document.id)
+    return document_data(document)
 
 
 @router.post("/documents/{document_id}/retry", status_code=202)

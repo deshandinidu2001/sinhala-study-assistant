@@ -90,3 +90,24 @@ def test_long_paragraphs_are_not_dropped_by_chunking() -> None:
     assert len(result) > 2
     assert all(len(part) <= 1700 for part in result)
     assert result[-1].endswith("photosynthesis")
+
+
+def test_legacy_font_with_latin_unicode_map_uses_ocr(tmp_path: Path) -> None:
+    from backend.pdf_pages import has_legacy_sinhala_font, render_page
+    path = tmp_path / "legacy.pdf"
+    write_pdf(path)
+    from pypdf import PdfReader
+    reader = PdfReader(path)
+    reader.pages[0]["/Resources"]["/Font"]["/F1"][NameObject("/BaseFont")] = NameObject("/ABCDEF+FMAbhayax")
+    assert has_legacy_sinhala_font(reader.pages[0])
+    writer = PdfWriter()
+    writer.append_pages_from_reader(reader)
+    writer.write(path)
+    with patch("backend.study.ocr", return_value="ජීව පටක යනු සමාන කෘත්‍යයක් ඉටු කරන සෛල සමූහයකි.") as mocked:
+        pages, method = extract_pages(path)
+    assert mocked.call_count == 1
+    assert method == "text+ocr" and pages[0]["ocr"]
+    assert "ජීව පටක" in pages[0]["text"]
+    assert render_page(path, 2).startswith(b"\x89PNG")
+    with pytest.raises(IndexError):
+        render_page(path, 0)

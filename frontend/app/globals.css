@@ -263,3 +263,10 @@ label small { font-weight: 400; color: var(--muted); font-size: 10px; }
   .source-page { padding: 25px 20px 40px; }
   .page-controls .secondary-button { padding: 8px 12px; }
 }
+
+.reader-view-controls, .reader-view-controls [role="group"] { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.reader-view-controls { justify-content: space-between; margin: 20px 0; }
+.reader-view-controls [aria-pressed="true"] { background: var(--primary, #365bb0); color: white; }
+.pdf-page { background: white; border: 1px solid #dce4f2; border-radius: 8px; overflow: hidden; min-height: 180px; }
+.pdf-page img { display: block; width: 100%; height: auto; }
+.pdf-page > p { padding: 24px; }

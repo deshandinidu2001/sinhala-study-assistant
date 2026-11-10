@@ -23,6 +23,7 @@ from pypdf import PdfReader
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from backend.pdf_pages import has_legacy_sinhala_font, render_page
 from backend.config import get_settings
 from backend.db.models import Chunk, Document
 from backend.db.session import get_engine
@@ -95,36 +96,20 @@ def extract_pages(path: Path) -> tuple[list[dict], str]:
             raise StudyError("මෙම PDF ලේඛනය මුරපදයකින් ආරක්ෂිතයි. මුරපදය ඉවත් කර නැවත එක් කරන්න.")
         if not 0 < len(reader.pages) <= MAX_PAGES:
             raise StudyError(f"වරකට පිටු {MAX_PAGES} දක්වා ඇති PDF ලේඛනයක් එක් කරන්න.")
-        rendered = None
-        try:
-            total = 0
-            for number, page in enumerate(reader.pages, 1):
-                text = normalize(page.extract_text() or "")
-                used_ocr = False
-                # Empty/scanned pages and visibly corrupt legacy encodings need OCR.
-                if len(words(text)) < 4 or text.count("\ufffd") > 3:
-                    import pypdfium2 as pdfium
-                    if rendered is None:
-                        rendered = pdfium.PdfDocument(path)
-                    pdf_page = rendered[number - 1]
-                    try:
-                        width, height = pdf_page.get_size()
-                        bitmap = pdf_page.render(scale=min(2.5, 3600 / max(width, height)))
-                        try:
-                            text = ocr(bitmap.to_pil())
-                        finally:
-                            bitmap.close()
-                    finally:
-                        pdf_page.close()
-                    used_ocr = True
-                    method = "text+ocr"
-                total += len(text)
-                if total > MAX_CHARACTERS:
-                    raise StudyError("ලේඛනයේ අකුරු ප්‍රමාණය වැඩියි. කුඩා කොටස්වලට බෙදා එක් කරන්න.")
-                pages.append({"page": number, "text": text, "ocr": used_ocr})
-        finally:
-            if rendered is not None:
-                rendered.close()
+        total = 0
+        for number, page in enumerate(reader.pages, 1):
+            text = normalize(page.extract_text() or "")
+            used_ocr = False
+            # Legacy Sinhala fonts may have a ToUnicode map that still returns Latin.
+            if len(words(text)) < 4 or text.count("\ufffd") > 3 or has_legacy_sinhala_font(page):
+                with Image.open(io.BytesIO(render_page(path, number))) as image:
+                    text = ocr(image)
+                used_ocr = True
+                method = "text+ocr"
+            total += len(text)
+            if total > MAX_CHARACTERS:
+                raise StudyError("ලේඛනයේ අකුරු ප්‍රමාණය වැඩියි. කුඩා කොටස්වලට බෙදා එක් කරන්න.")
+            pages.append({"page": number, "text": text, "ocr": used_ocr})
     elif extension in {".txt", ".md"}:
         try:
             raw = path.read_bytes()
