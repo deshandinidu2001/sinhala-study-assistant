@@ -191,3 +191,19 @@ def test_restart_resumes_interrupted_documents(client: TestClient, monkeypatch: 
         assert recovered["status"] == "ready"
         assert recovered["pages"][0]["text"].startswith("ප්‍රභාසංස්ලේෂණය")
     get_settings.cache_clear()
+
+
+def test_singlish_interpretation_retrieval_and_history(client: TestClient) -> None:
+    note = client.post("/documents/text", json={"title": "පටක", "content": "ජීව පටක යනු සමාන කෘත්‍යයක් ඉටු කරන සෛල සමූහයකි."}).json()
+    assert wait_document(client, note["id"])["status"] == "ready"
+    question = "MKD JIWA PATAKA KIYANNE"
+    preview = client.post("/questions/normalize", json={"question": question}).json()
+    assert "ජීව පටක" in preview["question"]
+    response = client.post("/chat", json={"question": question, "document_id": note["id"]})
+    assert response.status_code == 201, response.text
+    chat = response.json()
+    assert chat["mode"] == "extractive"
+    assert chat["question"] == question
+    assert "ජීව පටක" in chat["normalized_question"]
+    assert chat["sources"][0]["document_id"] == note["id"]
+    assert client.get("/chats").json()[-1]["normalized_question"] == chat["normalized_question"]

@@ -69,6 +69,7 @@ class Chat(Base):
     __tablename__ = "chats"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    details: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     question: Mapped[str] = mapped_column(Text)
     answer: Mapped[str] = mapped_column(Text)
     sources: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))

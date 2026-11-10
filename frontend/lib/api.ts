@@ -13,7 +13,7 @@ export type StudyDocument = {
   error: string | null; extraction_method: string | null; uploaded_at: string;
 };
 export type Source = { document_id: string; title: string; page: number; excerpt?: string; ocr?: boolean; section?: boolean };
-export type Chat = { id: string; question: string; answer: string; sources: Source[]; mode: "extractive" | "no_match"; created_at: string };
+export type Chat = { id: string; question: string; answer: string; sources: Source[]; mode: "extractive" | "no_match" | "gemini"; normalized_question?: string; normalization?: string; notice?: string; created_at: string };
 export type QuizQuestion = { prompt: string; options: string[] };
 export type Quiz = { id: string; subject: string; questions: QuizQuestion[] };
 export type QuizResult = { score: number; total: number; questions: (QuizQuestion & { answer_index: number; selected_index: number; correct: boolean; explanation: string; source: Source })[] };
