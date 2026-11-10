@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.singlish import normalize_question
+from backend import gemini
 from backend.pdf_pages import render_page
 from backend.config import get_settings
 from backend.db.models import Chat, Document, Quiz
@@ -194,10 +194,15 @@ def chat_data(chat: Chat) -> dict:
             "notice": (chat.details or {}).get("notice"), "created_at": chat.created_at.isoformat()}
 
 
+@router.get("/capabilities")
+def capabilities() -> dict:
+    return {"gemini_configured": gemini.configured(), "singlish": True}
+
+
 @router.post("/questions/normalize")
 def interpret_question(body: QuestionInput) -> dict:
-    question, method = normalize_question(body.question, body.language)
-    return {"question": question, "method": method}
+    question, method, notice = gemini.interpret(body.question, body.language)
+    return {"question": question, "method": method, "notice": notice}
 
 
 @router.get("/chats")
@@ -210,13 +215,23 @@ def list_chats(db: DB) -> list[dict]:
 def ask_question(body: QuestionInput, db: DB) -> dict:
     if body.document_id:
         require_document(db, body.document_id)
-    question, normalization = normalize_question(body.question, body.language)
+    question, normalization, notice = gemini.interpret(body.question, body.language)
     sources = retrieve(db, question, body.subject, body.document_id)
     if sources:
         answer = "ඔබේ ලේඛනවලින් හමු වූ අදාළ කොටස්:\n\n" + "\n\n".join(f"{source['excerpt']} [{i}]" for i, source in enumerate(sources, 1))
     else:
         answer = "ඔබේ ලේඛනවල මෙම ප්‍රශ්නයට අදාළ තොරතුරු හමු නොවීය. අදාළ පාඩම එක් කරන්න හෝ ලේඛනයේ ඇති ප්‍රධාන වචන භාවිත කර ප්‍රශ්නය නැවත අසන්න."
-    chat = Chat(question=body.question, answer=answer, sources=sources, subject=body.subject, details={"normalized_question": question, "normalization": normalization})
+    mode = "extractive" if sources else "no_match"
+    if sources and gemini.configured():
+        try:
+            explanation = gemini.explain(question, sources)
+            if explanation:
+                answer, mode = explanation, "gemini"
+            else:
+                notice = "Gemini පිළිතුර මූලාශ්‍රවලින් තහවුරු කළ නොහැකි නිසා අදාළ කොටස් උපුටා පෙන්වයි."
+        except gemini.GeminiUnavailable:
+            notice = gemini.FALLBACK_NOTICE
+    chat = Chat(question=body.question, answer=answer, sources=sources, subject=body.subject, details={"normalized_question": question, "normalization": normalization, "mode": mode, "notice": notice})
     db.add(chat)
     db.commit()
     db.refresh(chat)

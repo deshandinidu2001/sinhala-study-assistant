@@ -45,6 +45,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("DATABASE_URL", test_url)
     monkeypatch.setenv("STORAGE_PATH", str(tmp_path))
     monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("GEMINI_API_KEY", "")
     get_engine.cache_clear()
     get_settings.cache_clear()
     try:
@@ -207,3 +208,23 @@ def test_singlish_interpretation_retrieval_and_history(client: TestClient) -> No
     assert "ජීව පටක" in chat["normalized_question"]
     assert chat["sources"][0]["document_id"] == note["id"]
     assert client.get("/chats").json()[-1]["normalized_question"] == chat["normalized_question"]
+
+
+def test_gemini_provenance_scope_and_failure_fallback(client: TestClient, monkeypatch) -> None:
+    from backend import gemini
+    note = client.post("/documents/text", json={"title": "හරිතප්‍රද", "subject": "විද්‍යාව", "content": NOTE}).json()
+    assert wait_document(client, note["id"])["status"] == "ready"
+    monkeypatch.setattr(gemini, "configured", lambda: True)
+    monkeypatch.setattr(gemini, "explain", lambda question, sources: "හරිත ශාක ආහාර නිපදවයි. [1]")
+    request = {"question": "ප්‍රභාසංස්ලේෂණය යනු කුමක්ද?", "document_id": note["id"]}
+    chat = client.post("/chat", json=request).json()
+    assert chat["mode"] == "gemini"
+    assert client.get("/chats").json()[-1]["mode"] == "gemini"
+    def fail(*args):
+        raise gemini.GeminiUnavailable
+    monkeypatch.setattr(gemini, "explain", fail)
+    fallback = client.post("/chat", json=request).json()
+    assert fallback["mode"] == "extractive" and fallback["notice"]
+    assert fallback["sources"][0]["document_id"] == note["id"]
+    unmatched = client.post("/chat", json={**request, "subject": "ඉතිහාසය"}).json()
+    assert unmatched["mode"] == "no_match" and unmatched["sources"] == []

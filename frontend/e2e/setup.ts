@@ -20,7 +20,7 @@ export default async function setup() {
   };
   try {
     databaseAction(`CREATE DATABASE "${database}"`); databaseCreated = true;
-    docker(["compose", "run", "--detach", "--no-deps", "--name", container, "--publish", "127.0.0.1:8001:8000", "--volume", `${volume}:/app/storage`, "--env", "APP_ENV=test", "backend"], { ...process.env, POSTGRES_DB: database });
+    docker(["compose", "run", "--detach", "--no-deps", "--name", container, "--publish", "127.0.0.1:8001:8000", "--volume", `${volume}:/app/storage`, "--env", "APP_ENV=test", "--env", "GEMINI_API_KEY=", "backend"], { ...process.env, POSTGRES_DB: database });
     for (let attempt = 0; attempt < 45; attempt++) {
       try { if ((await fetch("http://localhost:8001/health")).ok) return cleanup; } catch { /* Waiting for migration and API startup. */ }
       await new Promise(resolve => setTimeout(resolve, 500));
