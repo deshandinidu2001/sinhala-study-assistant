@@ -190,6 +190,7 @@ def chat_data(chat: Chat) -> dict:
     return {"id": str(chat.id), "question": chat.question, "answer": chat.answer,
             "sources": chat.sources, "subject": chat.subject,
             "mode": (chat.details or {}).get("mode", "extractive" if chat.sources else "no_match"),
+            "document_id": (chat.details or {}).get("document_id"),
             "normalized_question": (chat.details or {}).get("normalized_question", chat.question),
             "normalization": (chat.details or {}).get("normalization", "original"),
             "notice": (chat.details or {}).get("notice"), "created_at": chat.created_at.isoformat()}
@@ -248,7 +249,7 @@ def ask_question(body: QuestionInput, db: DB) -> dict:
                 notice = "Gemini පිළිතුර මූලාශ්‍රවලින් තහවුරු කළ නොහැකි නිසා අදාළ කොටස් උපුටා පෙන්වයි."
         except gemini.GeminiUnavailable:
             notice = gemini.FALLBACK_NOTICE
-    chat = Chat(question=body.question, answer=answer, sources=sources, subject=body.subject, details={"normalized_question": question, "normalization": normalization, "mode": mode, "notice": notice})
+    chat = Chat(question=body.question, answer=answer, sources=sources, subject=body.subject, details={"document_id": str(body.document_id) if body.document_id else None, "normalized_question": question, "normalization": normalization, "mode": mode, "notice": notice})
     db.add(chat)
     db.commit()
     db.refresh(chat)
