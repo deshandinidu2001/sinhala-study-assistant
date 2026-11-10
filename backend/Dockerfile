@@ -7,7 +7,10 @@ RUN --mount=type=secret,id=build_ca \
 COPY backend/requirements.lock /tmp/requirements.lock
 RUN --mount=type=secret,id=build_ca \
     if [ -f /run/secrets/build_ca ]; then export PIP_CERT=/run/secrets/build_ca; fi; \
-    pip install -r /tmp/requirements.lock
+    pip install -r /tmp/requirements.lock && \
+    if [ -f /run/secrets/build_ca ]; then \
+      python -c "from pathlib import Path; import certifi; p=Path(certifi.where()); p.write_bytes(p.read_bytes()+b'\\n'+Path('/run/secrets/build_ca').read_bytes())"; \
+    fi
 COPY backend/ /app/backend/
 RUN pip install --no-deps --no-build-isolation ./backend && useradd --create-home appuser && mkdir /app/storage && chown appuser:appuser /app/storage
 ENV PYTEST_ADDOPTS="-p no:cacheprovider"

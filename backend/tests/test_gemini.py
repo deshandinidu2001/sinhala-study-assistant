@@ -44,7 +44,7 @@ def test_rest_contract_and_server_only_key(monkeypatch):
 
 @pytest.mark.parametrize("status,data", [
     (401, {"error": "private-provider-error"}), (429, {}), (503, {}),
-    (200, {}), (200, response({"question": "x"})),
+    (200, {}), (200, {"candidates": [None]}), (200, response({"question": "x"})),
     (200, response({"question": "ජීව පටක"}, "SAFETY")),
 ])
 def test_provider_failures_keep_local_singlish_working(monkeypatch, caplog, status, data):

@@ -1,5 +1,34 @@
 # Working study workflows
 
+## PDF, Singlish, and Gemini update - 2026-11-10
+
+Original PDFs now render as page images using embedded fonts and artwork, with page navigation, full PDF access, and an extracted-text view. FM/DL legacy Sinhala font detection triggers OCR even when a Unicode map returns Latin-looking text. Reprocessing preserves the original document ID and replaces its search chunks. Older quoted chat answers retain their original text.
+
+Singlish accepts informal Latin spellings, including `MKD JIWA PATAKA KIYANNE`. An editable preview never submits automatically; history retains both the typed and interpreted questions. English/Sinhala can bypass conversion. The offline converter is approximate; Gemini optionally handles broader spellings and generates Sinhala explanations from retrieved excerpts.
+
+Gemini credentials remain server-side in ignored `.env`. Provider requests have a configurable 15-second timeout per call, no automatic retries, structured response validation, and source-number validation. Missing keys, HTTP errors, timeouts, blocked/truncated output, malformed JSON, and invalid citations retain local passage answers. The configured banner does not claim provider connectivity. No-source queries do not invoke answer generation.
+
+Verification for this update:
+
+| Check | Result |
+| --- | --- |
+| Python 3.11 backend, real PostgreSQL workflows, extraction and Gemini fallback checks | 51 passed |
+| Frontend Vitest | 7 passed |
+| TypeScript and Linux production build | Passed |
+| Desktop/mobile browser acceptance | 18 passed |
+| Final PDF/Singlish browser regression checks after accessibility/copy fixes | 4 passed |
+| Alembic schema comparison | No new upgrade operations |
+| Actual legacy Sinhala PDF | 18 pages reprocessed; original page images and Sinhala OCR verified |
+| Exact reported Singlish question against that PDF | Returned cited Sinhala passages |
+| Runtime HTTPS to Gemini without credentials | TLS succeeded; expected HTTP 403 authentication response |
+
+The browser suites use disposable databases and storage, and remove their test containers and volumes. Final screenshots are under ignored `.artifacts/qa/`. The actual workspace smoke check adds one cited answer to the user's existing question history. Public CA certificates supplied through the existing optional BuildKit trust secret are retained in the backend HTTPS trust bundle; certificate verification is enabled.
+
+ Live Gemini generation remains unverified until a valid key is supplied. Mocked REST checks cover authentication headers, structured output, malformed output, provider errors, timeouts, and citation validation. The real uploaded 18-page legacy Sinhala PDF was reprocessed locally, visually checked at desktop/mobile widths, and returned cited passages for the exact Singlish question from the reported issue.
+
+## Previous workflow baseline (2026-11-09)
+
+
 Date: 2026-11-09 (Asia/Colombo).
 
 ## Original problem and implemented behavior
@@ -46,6 +75,6 @@ Quizzes are source-sentence fill-in-the-blank exercises, with up to five questio
 
 OCR quality varies with the source; check recognised text against originals. Browser dictation was exercised with a simulated recognition result to verify editable text and no automatic submission. Live microphone access, browser service availability, and real spoken Sinhala accuracy remain dependent on the user's device and browser.
 
-The trusted local shared-workspace scope remains. Authentication, multi-user isolation, generative model integration, Whisper transcription, retrieval benchmarking, and public production deployment are not claimed.
+The trusted local shared-workspace scope remains. Authentication, multi-user isolation, Whisper transcription, retrieval benchmarking, and public production deployment are not claimed. Optional Gemini integration is described in the 2026-11-10 update above; live provider generation requires a key.
 
 Technical extraction references: [FastAPI file uploads](https://fastapi.tiangolo.com/tutorial/request-files/), [pypdf text extraction](https://pypdf.readthedocs.io/en/stable/user/extract-text.html), [Tesseract language data](https://github.com/tesseract-ocr/tessdoc/blob/main/Data-Files.md).

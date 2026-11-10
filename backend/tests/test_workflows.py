@@ -228,3 +228,27 @@ def test_gemini_provenance_scope_and_failure_fallback(client: TestClient, monkey
     assert fallback["sources"][0]["document_id"] == note["id"]
     unmatched = client.post("/chat", json={**request, "subject": "ඉතිහාසය"}).json()
     assert unmatched["mode"] == "no_match" and unmatched["sources"] == []
+
+
+def test_pdf_original_preview_navigation_and_reprocessing(client: TestClient, tmp_path: Path) -> None:
+    path = tmp_path / "reader.pdf"
+    write_pdf(path)
+    response = client.post("/documents", files={"file": ("reader.pdf", path.read_bytes(), "application/pdf")})
+    document_id = response.json()["id"]
+    assert wait_document(client, document_id)["status"] == "ready"
+    for number in [1, 2]:
+        image = client.get(f"/documents/{document_id}/pages/{number}/image")
+        assert image.status_code == 200
+        assert image.headers["content-type"] == "image/png"
+        assert image.content.startswith(b"\x89PNG")
+    for number in [0, -1, 3]:
+        assert client.get(f"/documents/{document_id}/pages/{number}/image").status_code == 404
+    assert client.post(f"/documents/{document_id}/reprocess").status_code == 202
+    document = wait_document(client, document_id)
+    assert document["status"] == "ready" and document["page_count"] == 2
+    assert client.get(f"/documents/{document_id}/file").content == path.read_bytes()
+    with Session(get_engine()) as db:
+        assert len(db.scalars(select(Chunk).where(Chunk.document_id == document_id)).all()) == 2
+    source_path_with_id = f"/documents/{document_id}/pages/1/image"
+    assert client.delete(f"/documents/{document_id}").status_code == 204
+    assert client.get(source_path_with_id).status_code == 404

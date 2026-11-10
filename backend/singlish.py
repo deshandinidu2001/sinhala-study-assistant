@@ -21,7 +21,7 @@ ALIASES = {
     "harithaprada": "හරිතප්‍රද", "harithapradha": "හරිතප්‍රද",
     "prabhasansleshanaya": "ප්‍රභාසංස්ලේෂණය", "prabhasanshleshanaya": "ප්‍රභාසංස්ලේෂණය",
     "prabhasanshleshanayedi": "ප්‍රභාසංස්ලේෂණයේදී",
-    "jalaya": "ජලය", "alokay a": "ආලෝකය", "alokaya": "ආලෝකය",
+    "jalaya": "ජලය", "alokaya": "ආලෝකය",
     "suryalokaya": "සූර්යාලෝකය", "sooryalokaya": "සූර්යාලෝකය",
     "ahara": "ආහාර", "aahara": "ආහාර", "mul": "මූල", "mula": "මූල",
     "padum": "පාඩම්", "padama": "පාඩම", "ganithaya": "ගණිතය",
@@ -69,7 +69,7 @@ def _word(token: str) -> str:
 
 def normalize_question(question: str, language: str = "auto") -> tuple[str, str]:
     tokens = re.findall(r"[A-Za-z]+", question)
-    singlish = language == "singlish" or (language == "auto" and any(t.lower() in ALIASES for t in tokens))
+    singlish = language == "singlish" or (language == "auto" and any(t.lower() in ALIASES and t.lower() not in {"ai", "ha", "mul", "gana", "saha"} for t in tokens))
     if not singlish:
         return question, "original"
     converted = re.sub(r"[A-Za-z]+", lambda match: _word(match.group()), question)

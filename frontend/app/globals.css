@@ -270,3 +270,9 @@ label small { font-weight: 400; color: var(--muted); font-size: 10px; }
 .pdf-page { background: white; border: 1px solid #dce4f2; border-radius: 8px; overflow: hidden; min-height: 180px; }
 .pdf-page img { display: block; width: 100%; height: auto; }
 .pdf-page > p { padding: 24px; }
+
+.question-form > select { display: block; width: 100%; margin-top: 7px; }
+.question-interpretation { margin-top: 18px; padding: 16px; background: #f3f6fd; border: 1px solid #dce4f2; border-radius: 8px; }
+.question-interpretation textarea { width: 100%; display: block; margin: 8px 0; }
+.question-interpretation .voice-notice { margin-top: 8px; }
+.question-bubble > small { display: block; margin-top: 10px; font-size: 11px; overflow-wrap: anywhere; }

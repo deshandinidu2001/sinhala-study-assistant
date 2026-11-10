@@ -190,3 +190,87 @@ test("Sinhala image OCR reads a rendered study note", async ({ page, request }, 
   expect(document.pages[0].text).toContain("ශාක");
   expect(document.pages[0].text).toContain("ජලය");
 });
+
+
+function twoPagePdf() {
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 6 0 R >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 7 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ...["Photosynthesis uses sunlight to produce food in green plants.", "Chlorophyll absorbs light energy inside the chloroplast."].map(text => {
+      const stream = `BT /F1 18 Tf 40 700 Td (${text}) Tj ET`;
+      return `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
+    }),
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  for (const [i, object] of objects.entries()) { offsets.push(pdf.length); pdf += `${i + 1} 0 obj\n${object}\nendobj\n`; }
+  const xref = pdf.length;
+  pdf += `xref\n0 ${offsets.length}\n0000000000 65535 f \n`;
+  pdf += offsets.slice(1).map(offset => `${String(offset).padStart(10, "0")} 00000 n \n`).join("");
+  pdf += `trailer\n<< /Size ${offsets.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return Buffer.from(pdf);
+}
+
+test("original PDF pages, extracted text, citations and reprocessing", async ({ page, request }, info) => {
+  const uploaded = await request.post("http://localhost:8001/documents", { multipart: { file: { name: "reader.pdf", mimeType: "application/pdf", buffer: twoPagePdf() } } });
+  expect(uploaded.status()).toBe(202);
+  const { id } = await uploaded.json();
+  await expect.poll(async () => (await (await request.get(`http://localhost:8001/documents/${id}`)).json()).status).toBe("ready");
+  await page.goto(`/documents/${id}?page=2`);
+  const image = page.getByRole("img", { name: "reader · පිටුව 2", exact: true });
+  await expect(image).toBeVisible();
+  await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(600);
+  await expect(page.getByLabel("පිටුව තෝරන්න", { exact: true })).toHaveValue("2");
+  await noOverflow(page);
+  await page.screenshot({ path: `../.artifacts/qa/${info.project.name}-pdf-reader.png`, fullPage: true });
+  await page.getByRole("button", { name: "හඳුනාගත් අකුරු", exact: true }).click();
+  await expect(page.locator("article.source-page")).toContainText("Chlorophyll");
+  await page.getByRole("button", { name: "අකුරු නැවත හඳුනාගන්න", exact: true }).click();
+  await expect(page.locator("article.source-page")).toContainText("Chlorophyll");
+  await page.getByRole("link", { name: "පෙර", exact: true }).click();
+  await expect(page.getByLabel("පිටුව තෝරන්න", { exact: true })).toHaveValue("1");
+  const broken = page.waitForResponse(response => response.url().endsWith("/pages/1/image"));
+  await page.route(`**/documents/${id}/pages/1/image`, route => route.fulfill({ status: 503, body: "unavailable" }));
+  // Force a fresh document mount so the error and retry path runs even if cached.
+  await page.goto("/documents");
+  await page.goto(`/documents/${id}`);
+  await broken;
+  await expect(page.getByRole("main").getByRole("alert")).toContainText("PDF පිටුව පූරණය කළ නොහැක");
+  await page.unroute(`**/documents/${id}/pages/1/image`);
+  await page.getByRole("button", { name: "නැවත උත්සාහ කරන්න", exact: true }).click();
+  await expect(page.getByRole("img", { name: "reader · පිටුව 1", exact: true })).toBeVisible();
+});
+
+test("Singlish preview stays editable and retrieves a Sinhala cited answer", async ({ page, request }, info) => {
+  const uploaded = await request.post("http://localhost:8001/documents/text", { data: { title: "ජීව පටක", content: "ජීව පටක යනු සමාන කෘත්‍යයක් ඉටු කරන සෛල සමූහයකි. ශාක පටක වර්ග කිහිපයකින් සමන්විත වේ." } });
+  const { id } = await uploaded.json();
+  await expect.poll(async () => (await (await request.get(`http://localhost:8001/documents/${id}`)).json()).status).toBe("ready");
+  await page.goto(`/chat?document=${id}`);
+  const question = page.getByRole("textbox", { name: "ඔබේ ප්‍රශ්නය", exact: true });
+  await expect(question).toBeEnabled();
+  await expect(page.getByText("පෙර ප්‍රශ්න ලබාගනිමින්…", { exact: true })).toHaveCount(0);
+  const count = await page.locator(".chat-exchange").count();
+  await question.fill("MKD JIWA PATAKA KIYANNE");
+  await page.getByRole("button", { name: "සිංහලෙන් බලන්න", exact: true }).click();
+  const preview = page.getByRole("textbox", { name: "සිංහල ප්‍රශ්නය පරීක්ෂා කරන්න", exact: true });
+  await expect(preview).toHaveValue(/ජීව පටක/);
+  await preview.fill("ජීව පටක යනු කුමක්ද?");
+  await expect(page.locator(".chat-exchange")).toHaveCount(count);
+  await page.getByRole("button", { name: "මෙම ප්‍රශ්නය භාවිත කරන්න", exact: true }).click();
+  await expect(question).toHaveValue("ජීව පටක යනු කුමක්ද?");
+  await question.fill("MKD JIWA PATAKA KIYANNE");
+  await page.getByLabel("ලියන ආකාරය", { exact: true }).selectOption("singlish");
+  await page.getByRole("button", { name: "ප්‍රශ්නය යවන්න", exact: true }).click();
+  await expect(question).toHaveValue("");
+  const exchange = page.locator(".chat-exchange").last();
+  await expect(exchange).toContainText("සිංහලෙන්: මොකක්ද ජීව පටක කියන්නේ");
+  await expect(exchange.locator(".answer-bubble")).toContainText("සෛල සමූහයකි");
+  await expect(exchange.locator(".source-link")).toHaveAttribute("href", `/documents/${id}?page=1`);
+  await noOverflow(page);
+  await page.screenshot({ path: `../.artifacts/qa/${info.project.name}-singlish.png`, fullPage: true });
+  await page.reload();
+  await expect(page.locator(".chat-exchange").last()).toContainText("සිංහලෙන්: මොකක්ද ජීව පටක කියන්නේ");
+});

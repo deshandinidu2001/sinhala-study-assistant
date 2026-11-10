@@ -52,7 +52,7 @@ def generate(instruction: str, data: dict, schema: type[BaseModel]) -> BaseModel
             raise ValueError("Incomplete or blocked output")
         content = "".join(part.get("text", "") for part in candidate["content"]["parts"] if not part.get("thought"))
         return schema.model_validate_json(content)
-    except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError, ValidationError) as error:
+    except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError, AttributeError, ValidationError) as error:
         # Never log request headers, question text, provider bodies, or API keys.
         logger.warning("Gemini request unavailable (%s)", type(error).__name__)
         raise GeminiUnavailable from None

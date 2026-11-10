@@ -12,7 +12,7 @@ def test_common_singlish_spellings_match_sinhala_sources(question):
 
 
 def test_native_sinhala_and_english_remain_unchanged():
-    for question in ["ජීව පටක යනු කුමක්ද?", "What is photosynthesis?"]:
+    for question in ["ජීව පටක යනු කුමක්ද?", "What is photosynthesis?", "What is AI?"]:
         assert normalize_question(question) == (question, "original")
     assert normalize_question("jiwa pataka", "original") == ("jiwa pataka", "original")
 
