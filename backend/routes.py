@@ -15,9 +15,9 @@ from sqlalchemy.orm import Session
 from backend import gemini
 from backend.pdf_pages import render_page
 from backend.config import get_settings
-from backend.db.models import Chat, Document, Quiz
+from backend.db.models import Chat, Chunk, Document, Quiz
 from backend.db.session import get_db
-from backend.study import EXTENSIONS, StudyError, document_folder, ingest, make_quiz, normalize, retrieve, source_path
+from backend.study import EXTENSIONS, StudyError, document_folder, ingest, make_quiz, normalize, retrieve, source_path, words
 
 router = APIRouter()
 DB = Annotated[Session, Depends(get_db)]
@@ -194,14 +194,28 @@ def chat_data(chat: Chat) -> dict:
             "notice": (chat.details or {}).get("notice"), "created_at": chat.created_at.isoformat()}
 
 
+def question_vocabulary(db: Session, body: QuestionInput) -> set[str]:
+    query = select(Chunk.text).join(Document).where(Document.status == "ready")
+    if body.document_id:
+        query = query.where(Document.id == body.document_id)
+    if body.subject:
+        query = query.where(Document.subject == body.subject)
+    vocabulary = set()
+    for content in db.scalars(query.order_by(Chunk.document_id, Chunk.page, Chunk.chunk_index).limit(500)):
+        vocabulary.update(words(content))
+        if len(vocabulary) >= 10000:
+            break
+    return vocabulary
+
+
 @router.get("/capabilities")
 def capabilities() -> dict:
     return {"gemini_configured": gemini.configured(), "singlish": True}
 
 
 @router.post("/questions/normalize")
-def interpret_question(body: QuestionInput) -> dict:
-    question, method, notice = gemini.interpret(body.question, body.language)
+def interpret_question(body: QuestionInput, db: DB) -> dict:
+    question, method, notice = gemini.interpret(body.question, body.language, question_vocabulary(db, body))
     return {"question": question, "method": method, "notice": notice}
 
 
@@ -215,7 +229,7 @@ def list_chats(db: DB) -> list[dict]:
 def ask_question(body: QuestionInput, db: DB) -> dict:
     if body.document_id:
         require_document(db, body.document_id)
-    question, normalization, notice = gemini.interpret(body.question, body.language)
+    question, normalization, notice = gemini.interpret(body.question, body.language, question_vocabulary(db, body))
     sources = retrieve(db, question, body.subject, body.document_id)
     if sources:
         answer = "ඔබේ ලේඛනවලින් හමු වූ අදාළ කොටස්:\n\n" + "\n\n".join(f"{source['excerpt']} [{i}]" for i, source in enumerate(sources, 1))

@@ -58,8 +58,8 @@ def generate(instruction: str, data: dict, schema: type[BaseModel]) -> BaseModel
         raise GeminiUnavailable from None
 
 
-def interpret(question: str, language: str) -> tuple[str, str, str | None]:
-    local, method = normalize_question(question, language)
+def interpret(question: str, language: str, vocabulary=()) -> tuple[str, str, str | None]:
+    local, method = normalize_question(question, language, vocabulary)
     if language == "original" or not re.search(r"[A-Za-z]", question) or not configured():
         return local, method, None
     try:

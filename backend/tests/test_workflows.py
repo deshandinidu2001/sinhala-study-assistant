@@ -252,3 +252,17 @@ def test_pdf_original_preview_navigation_and_reprocessing(client: TestClient, tm
     source_path_with_id = f"/documents/{document_id}/pages/1/image"
     assert client.delete(f"/documents/{document_id}").status_code == 204
     assert client.get(source_path_with_id).status_code == 404
+
+
+def test_informal_singlish_uses_selected_source_vocabulary(client: TestClient) -> None:
+    note = client.post("/documents/text", json={"title": "රුධිර පටක", "content": "රුධිර පටකයේ කාර්යයන් වන්නේ ඔක්සිජන් හා පෝෂක ද්‍රව්‍ය ප්‍රවාහනය කිරීමයි. ශ්වසනය සෛල තුළ ශක්තිය නිදහස් කරන ක්‍රියාවලියකි."}).json()
+    assert wait_document(client, note["id"])["status"] == "ready"
+    for text in ["rudira patakaye karyan mnd", "swasanaya yanu kumakda"]:
+        body = {"question": text, "document_id": note["id"]}
+        preview = client.post("/questions/normalize", json=body).json()
+        if text.startswith("swasanaya"):
+            assert "ශ්වසනය" in preview["question"]
+        chat = client.post("/chat", json=body).json()
+        assert chat["mode"] == "extractive" and chat["sources"][0]["document_id"] == note["id"]
+    unrelated = client.post("/chat", json={"question": "gini kandu mokakda", "document_id": note["id"]}).json()
+    assert unrelated["mode"] == "no_match"
