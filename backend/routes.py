@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend import gemini
+from backend.summaries import make_summary, cached_summary, SUMMARY_NO_KEY, SUMMARY_UNAVAILABLE
 from backend.quizzes import make_mcq_quiz, NO_KEY, UNAVAILABLE
 from backend.pdf_pages import render_page
 from backend.config import get_settings
@@ -255,6 +256,37 @@ def ask_question(body: QuestionInput, db: DB) -> dict:
     db.commit()
     db.refresh(chat)
     return chat_data(chat)
+
+
+class SummaryInput(BaseModel):
+    language: Literal["si", "en"] = "si"
+    focus: str = Field(default="", max_length=500)
+    regenerate: bool = False
+
+
+@router.get("/documents/{document_id}/summary")
+def get_summary(document_id: UUID, db: DB, language: Literal["si", "en"] = "si", focus: str = "") -> dict:
+    document = require_document(db, document_id)
+    if document.status != "ready":
+        raise HTTPException(409, "ලේඛනය තවම සූදානම් නැත.")
+    try:
+        result = cached_summary(document, language, focus[:500])
+    except StudyError as error:
+        raise HTTPException(422, str(error))
+    return {"summary": result}
+
+
+@router.post("/documents/{document_id}/summary")
+def create_summary(document_id: UUID, body: SummaryInput, db: DB) -> dict:
+    document = require_document(db, document_id)
+    if document.status != "ready":
+        raise HTTPException(409, "ලේඛනය තවම සූදානම් නැත.")
+    try:
+        return make_summary(document, body.language, body.focus.strip(), body.regenerate)
+    except StudyError as error:
+        raise HTTPException(422, str(error))
+    except gemini.GeminiUnavailable as error:
+        raise HTTPException(503, SUMMARY_NO_KEY if str(error) == SUMMARY_NO_KEY else SUMMARY_UNAVAILABLE)
 
 
 class QuizInput(BaseModel):

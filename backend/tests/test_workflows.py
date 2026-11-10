@@ -321,3 +321,33 @@ def test_mcq_api_missing_key_scope_and_failed_generation(client: TestClient, mon
     assert client.post("/quizzes", json=body).status_code == 503
     with Session(get_engine()) as db:
         assert db.scalars(select(Quiz)).all() == []
+
+
+def test_document_summary_api_cache_language_and_missing_source(client: TestClient, monkeypatch):
+    from backend import gemini
+    from backend.tests.test_summaries import summary_draft
+    note = client.post("/documents/text", json={"title": "Summary source", "content": NOTE}).json()
+    assert wait_document(client, note["id"])["status"] == "ready"
+    path = f"/documents/{note['id']}/summary"
+    assert client.get(path).json() == {"summary": None}
+    assert client.post(path, json={"language": "en"}).status_code == 503
+    monkeypatch.setattr(gemini, "configured", lambda: True)
+    def generated(*args, **kwargs):
+        result = summary_draft()
+        for section in result.sections:
+            for point in section.points:
+                point.evidence_quote = NOTE[:80]
+        for term in result.key_terms:
+            term.definition.evidence_quote = NOTE[:80]
+        for point in result.revision_points:
+            point.evidence_quote = NOTE[:80]
+        return result
+    monkeypatch.setattr(gemini, "generate", generated)
+    response = client.post(path, json={"language": "en", "focus": "functions"})
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["sections"][0]["points"][0]["source"]["document_id"] == note["id"]
+    assert client.get(path + "?language=en&focus=functions").json()["summary"] == result
+    assert client.get(path + "?language=si&focus=functions").json()["summary"] is None
+    assert client.delete(f"/documents/{note['id']}").status_code == 204
+    assert client.get(path).status_code == 404

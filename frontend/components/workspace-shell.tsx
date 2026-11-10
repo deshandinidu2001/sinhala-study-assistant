@@ -24,7 +24,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
     window.addEventListener("keydown", escape);
     return () => window.removeEventListener("keydown", escape);
   }, [open]);
-  const title = pathname === "/" ? t("අධ්‍යයන මේසය", "Study desk") : pathname.startsWith("/documents") ? t("ලේඛන", "Sources") : pathname.startsWith("/practice") ? t("පුහුණුව", "Practice") : t("සංවාදය", "Ask your notes");
+  const title = pathname === "/" ? t("අධ්‍යයන මේසය", "Study desk") : pathname.startsWith("/documents") ? t("ලේඛන", "Sources") : pathname.startsWith("/summaries") ? t("සාරාංශ", "Summaries") : pathname.startsWith("/practice") ? t("පුහුණුව", "Practice") : t("සංවාදය", "Ask your notes");
   function toggleSidebar() {
     setCollapsed(value => { try { localStorage.setItem("akura-sidebar", value ? "expanded" : "collapsed"); } catch {} return !value; });
   }

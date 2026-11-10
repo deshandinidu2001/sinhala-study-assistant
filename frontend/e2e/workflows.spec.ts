@@ -370,3 +370,55 @@ test("quiz generation failure stays actionable and never shows missing-word fall
   await expect(page.getByRole("button", { name: "Start practice", exact: true })).toBeEnabled();
   await expect(page.getByRole("combobox", { name: "Question language", exact: true })).toHaveValue("en");
 });
+
+
+test("new answers reveal gradually and can be shown immediately", async ({ page }) => {
+  const text = "Plants absorb light through chlorophyll. Light provides energy for photosynthesis and food production in green leaves. ".repeat(14);
+  let counter = 0;
+  await page.route("**/chat", route => route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: `animated-${counter++}`, question: "test question", normalized_question: "test question", answer: text, sources: [], mode: "extractive", created_at: new Date().toISOString() }) }));
+  await page.goto("/chat");
+  const question = page.getByRole("textbox", { name: "ඔබේ ප්‍රශ්නය", exact: true });
+  await expect(question).toBeEnabled();
+  await question.fill("test question");
+  await page.getByRole("button", { name: "ප්‍රශ්නය යවන්න", exact: true }).click();
+  const answer = page.locator(".chat-exchange").last().locator(".progressive-answer");
+  await expect(answer).toHaveAttribute("data-revealing", "true");
+  await expect.poll(async () => answer.locator(".answer-line").count()).toBeGreaterThan(0);
+  expect(await answer.locator(".answer-lines").innerText()).not.toContain(text.trim());
+  await page.getByRole("button", { name: "සම්පූර්ණ පිළිතුර බලන්න", exact: true }).click();
+  await expect(answer).toHaveAttribute("data-revealing", "false");
+  await expect(answer.locator(".answer-lines")).toContainText("photosynthesis");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await question.fill("test reduced motion");
+  await page.getByRole("button", { name: "ප්‍රශ්නය යවන්න", exact: true }).click();
+  await expect(page.locator(".chat-exchange").last().locator(".progressive-answer")).toHaveAttribute("data-revealing", "false");
+  await noOverflow(page);
+});
+
+test("focused summary shows key points, terms, revision and source citations", async ({ page, request }, info) => {
+  const response = await request.post("http://localhost:8001/documents/text", { data: { title: "Summary lesson", content: note } });
+  const { id } = await response.json();
+  await expect.poll(async () => (await (await request.get(`http://localhost:8001/documents/${id}`)).json()).status).toBe("ready");
+  const point = { text: "හරිත ශාක සූර්යාලෝකය භාවිතයෙන් ආහාර නිපදවයි.", source: { document_id: id, title: "Summary lesson", page: 1, section: true } };
+  let saved: object | null = null;
+  await page.route(`**/documents/${id}/summary**`, route => {
+    if (route.request().method() === "GET") return route.fulfill({ contentType: "application/json", body: JSON.stringify({ summary: saved }) });
+    const body = route.request().postDataJSON();
+    expect(body.focus).toBe("functions and definitions");
+    saved = { document_id: id, title: "Photosynthesis essentials", language: body.language, focus: body.focus, sections: [{ heading: "ශක්තිය සහ ආහාර", points: [point, point] }, { heading: "පත්‍ර", points: [point, point] }], key_terms: [{ term: "හරිතප්‍රද", ...point }, { term: "ප්‍රභාසංස්ලේෂණය", ...point }], revision_points: [point, point], coverage: { included_pages: 1, total_pages: 1, text_truncated: false }, mode: "gemini", generated_at: new Date().toISOString() };
+    return route.fulfill({ contentType: "application/json", body: JSON.stringify(saved) });
+  });
+  await page.goto(`/summaries?document=${id}`);
+  await page.getByRole("combobox", { name: "Interface language" }).selectOption("en");
+  await page.getByRole("textbox", { name: "Focus on", exact: true }).fill("functions and definitions");
+  await page.getByRole("button", { name: "Summarize", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Study summary", exact: true })).toBeVisible();
+  await expect(page.locator(".summary-section")).toHaveCount(2);
+  await expect(page.locator(".summary-terms dt")).toHaveCount(2);
+  await expect(page.locator(".revision-points li")).toHaveCount(2);
+  await expect(page.locator(".summary-section .source-link").first()).toHaveAttribute("href", `/documents/${id}?page=1`);
+  await noOverflow(page);
+  await page.screenshot({ path: `../.artifacts/qa/${info.project.name}-summary.png`, fullPage: true });
+  await page.getByRole("combobox", { name: "Interface language" }).selectOption("si");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("සාරාංශ");
+});

@@ -70,7 +70,7 @@ def test_generation_is_reviewed_and_option_feedback_stays_aligned():
 
 
 def test_review_failure_does_not_return_cloze_fallback():
-    with patch("backend.quizzes.source_material", return_value=SOURCES), patch.object(gemini, "configured", return_value=True), patch.object(gemini, "generate", side_effect=[draft(), Review(accepted_indices=[0, 2])]):
+    with patch("backend.quizzes.source_material", return_value=SOURCES), patch.object(gemini, "configured", return_value=True), patch.object(gemini, "generate", side_effect=[draft(), Review(accepted_indices=[0, 2]), draft(), Review(accepted_indices=[])]):
         with pytest.raises(StudyError, match=INVALID):
             make_mcq_quiz(None, None, None, language="en")
 
@@ -96,3 +96,25 @@ def test_evidence_alignment_recovers_exact_source_and_rejects_fabrication():
     align_evidence(value, SOURCES)
     with pytest.raises(StudyError):
         validate_draft(value, SOURCES, 1, "en")
+
+
+def test_partial_rejection_keeps_approved_questions_and_replaces_missing_items():
+    first = draft()
+    second = draft()
+    second.questions[1].prompt = "Which process uses light to make food in the leaves of a green plant?"
+    second.questions[3].prompt = "Which leaf pigment is responsible for absorbing sunlight energy?"
+    second.questions[4].prompt = "How is sunlight used by green plants to produce glucose?"
+    with patch("backend.quizzes.source_material", return_value=SOURCES), patch.object(gemini, "configured", return_value=True), patch.object(gemini, "generate", side_effect=[first, Review(accepted_indices=[0, 2]), second, Review(accepted_indices=[0, 1, 2])]) as generate:
+        result = make_mcq_quiz(None, None, None, language="en")
+    assert len(result) == 5 and generate.call_count == 4
+    assert result[0]["prompt"] == first.questions[0].prompt
+    assert len(generate.call_args_list[2].args[1]["already_approved_questions"]) == 2
+
+
+def test_extra_candidates_allow_one_rejected_item_without_failing_whole_quiz():
+    value = draft()
+    extra = value.questions[1].model_copy(deep=True)
+    extra.prompt = "How does a green leaf use light energy during glucose production?"
+    value.questions.append(extra)
+    with patch("backend.quizzes.source_material", return_value=SOURCES), patch.object(gemini, "configured", return_value=True), patch.object(gemini, "generate", side_effect=[value, Review(accepted_indices=[0, 1, 2, 3, 5])]):
+        assert len(make_mcq_quiz(None, None, None, language="en")) == 5

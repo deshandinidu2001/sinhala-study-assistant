@@ -6,6 +6,7 @@ import { api, type Chat } from "@/lib/api";
 import { useLanguage } from "@/lib/language";
 import { useDocuments } from "@/lib/use-documents";
 import { Icon } from "@/components/icon";
+import { ProgressiveAnswer } from "@/components/progressive-answer";
 import { SourceLink } from "@/components/source-link";
 
 type Recognition = { lang: string; interimResults: boolean; continuous: boolean; onresult: ((event: { results: { transcript: string }[][] }) => void) | null; onerror: ((event: { error: string }) => void) | null; onend: (() => void) | null; start: () => void; stop: () => void; abort: () => void };
@@ -25,6 +26,7 @@ export function ChatWorkspace() {
   const [interpreting, setInterpreting] = useState(false);
   const [interpretNotice, setInterpretNotice] = useState("");
   const [geminiConfigured, setGeminiConfigured] = useState<boolean | null>(null);
+  const [animatedAnswer, setAnimatedAnswer] = useState<string | null>(null);
   const [chats, setChats] = useState<Chat[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState("");
@@ -62,6 +64,11 @@ export function ChatWorkspace() {
   }, [attempt]);
   useEffect(() => { const voiceWindow = window as VoiceWindow; setVoiceSupported(Boolean(voiceWindow.SpeechRecognition || voiceWindow.webkitSpeechRecognition)); return () => recognition.current?.abort(); }, []);
   useEffect(() => { thread.current?.scrollTo({ top: thread.current.scrollHeight }); }, [chats.length, selected, historyLoading]);
+  function followAnswer() {
+    const element = thread.current;
+    if (element && element.scrollHeight - element.scrollTop - element.clientHeight < 180) element.scrollTo({ top: element.scrollHeight });
+  }
+  useEffect(() => setAnimatedAnswer(null), [selected, subject]);
   async function interpret() {
     if (busy || interpreting || question.trim().length < 2) return;
     recognition.current?.abort(); setInterpreting(true); setError("");
@@ -76,7 +83,7 @@ export function ChatWorkspace() {
     recognition.current?.abort(); setBusy(true); setError(""); setVoiceNotice("");
     try {
       const chat = await api<Chat>("/chat", { method: "POST", body: JSON.stringify({ question: question.trim(), language: inputLanguage, answer_language: interfaceLanguage, ...scope }) });
-      setChats(previous => [...previous, chat]); setQuestion("");
+      setAnimatedAnswer(chat.id); setChats(previous => [...previous, chat]); setQuestion("");
       requestAnimationFrame(() => composer.current?.focus());
     } catch (failure) { setError(failure instanceof Error ? failure.message : t("පිළිතුර ලබාගත නොහැක.", "Could not get an answer.")); }
     finally { setBusy(false); }
@@ -104,7 +111,7 @@ export function ChatWorkspace() {
         {scopedChats.length > visibleCount && <button className="earlier-button" onClick={() => setVisibleCount(value => value + 10)}>{t("පෙර ප්‍රශ්න", "Earlier questions")}</button>}
         {visibleChats.map(chat => <article className="chat-exchange" key={chat.id}>
           <div className="question-bubble"><span className="sr-only">{t("ඔබේ ප්‍රශ්නය", "Your question")}</span><p>{chat.question}</p>{chat.normalized_question && chat.normalized_question !== chat.question && <details className="interpretation-note"><summary>{t("සිංහල අර්ථකථනය", "Interpreted question")}</summary><p>{chat.normalized_question}</p></details>}</div>
-          <div className={`answer-bubble${chat.mode === "no_match" ? " no-match" : ""}`}><span className="answer-mark" aria-hidden="true">අ</span><div className="answer-content"><span className="answer-label">{chat.mode === "gemini" ? "Gemini" : chat.mode === "no_match" ? t("ගැළපීමක් නැත", "No matching passage") : t("ලේඛන උපුටාගැනීම්", "From your notes")}</span><p>{chat.mode === "no_match" ? t("පාඩමේ වචනයක් භාවිත කරන්න හෝ වෙනත් ලේඛනයක් තෝරන්න.", "Try a key term from your notes or choose another source.") : chat.answer.replace("ඔබේ ලේඛනවලින් හමු වූ අදාළ කොටස්:\n\n", "").replace("Relevant passages from your sources:\n\n", "")}</p>
+          <div className={`answer-bubble${chat.mode === "no_match" ? " no-match" : ""}`}><span className="answer-mark" aria-hidden="true">අ</span><div className="answer-content"><span className="answer-label">{chat.mode === "gemini" ? "Gemini" : chat.mode === "no_match" ? t("ගැළපීමක් නැත", "No matching passage") : t("ලේඛන උපුටාගැනීම්", "From your notes")}</span><ProgressiveAnswer text={chat.mode === "no_match" ? t("පාඩමේ වචනයක් භාවිත කරන්න හෝ වෙනත් ලේඛනයක් තෝරන්න.", "Try a key term from your notes or choose another source.") : chat.answer.replace("ඔබේ ලේඛනවලින් හමු වූ අදාළ කොටස්:\n\n", "").replace("Relevant passages from your sources:\n\n", "")} animate={animatedAnswer === chat.id} onProgress={followAnswer} onComplete={() => setAnimatedAnswer(current => current === chat.id ? null : current)} />
           {!!chat.sources.length && <div className="source-links" aria-label={t("පිළිතුරේ මූලාශ්‍ර", "Answer sources")}>{chat.sources.map((source, index) => <SourceLink key={`${source.document_id}-${source.page}`} source={source} index={index} />)}</div>}
           {(chat.notice || chat.sources.some(source => source.ocr)) && <details className="answer-details"><summary>{t("පිළිතුර ගැන", "About this answer")}</summary>{chat.notice && <p>{t(chat.notice)}</p>}{chat.sources.some(source => source.ocr) && <p>{t("OCR අකුරු මුල් පිටුව සමඟ බලන්න.", "Check OCR text against the original page.")}</p>}</details>}
           </div></div>
