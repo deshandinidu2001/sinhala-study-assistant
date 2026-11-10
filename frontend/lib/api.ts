@@ -16,9 +16,9 @@ export type StudyDocument = {
 };
 export type Source = { document_id: string; title: string; page: number; excerpt?: string; ocr?: boolean; section?: boolean };
 export type Chat = { id: string; question: string; answer: string; sources: Source[]; subject?: string | null; document_id?: string | null; mode: "extractive" | "no_match" | "gemini"; normalized_question?: string; normalization?: string; notice?: string; created_at: string };
-export type QuizQuestion = { prompt: string; options: string[] };
-export type Quiz = { id: string; subject: string; questions: QuizQuestion[] };
-export type QuizResult = { score: number; total: number; questions: (QuizQuestion & { answer_index: number; selected_index: number; correct: boolean; explanation: string; source: Source })[] };
+export type QuizQuestion = { prompt: string; options: string[]; skill?: "knowledge" | "understanding" | "application" };
+export type Quiz = { id: string; subject: string; grade?: number; kind?: string; language?: string; questions: QuizQuestion[] };
+export type QuizResult = { score: number; total: number; questions: (QuizQuestion & { answer_index: number; selected_index: number; correct: boolean; explanation: string; option_explanations?: string[]; evidence_quote?: string; source: Source })[] };
 export type DocumentDetail = StudyDocument & { pages: { page: number; text: string; ocr: boolean }[] };
 
 export function apiUrl(path: string): string {

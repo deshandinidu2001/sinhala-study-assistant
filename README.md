@@ -10,7 +10,7 @@ A bilingual Sinhala/English study workspace for your own notes and past papers. 
 - Read original PDF pages with their embedded fonts, diagrams, and layout; switch to extracted text for copying. Extract Unicode PDF text and use Tesseract Sinhala + English OCR for scanned PDFs, legacy Sinhala fonts (including FM/DL), and images. Maximum 25 MB per file, 150 pages, and one million extracted characters.
 - Search the library by name/subject, filter by subject, read pages, and open original files.
 - Ask questions within a subject, one document, or the whole library. Relevant source passages include clickable document/page citations. Unmatched questions return a clear no-match message.
-- Create up to five multiple-choice fill-in-the-blank questions from actual source sentences. The server grades answers and returns explanations and source links after submission.
+- Generate five standard Grade 11 MCQs with Gemini: complete conceptual questions, four plausible options, one correct answer, and a mix of knowledge, understanding, and application. Each question is checked against its source and reviewed before saving. After submission, see explanations for every option and a source passage.
 - Switch the interface between English and Sinhala; the preference persists across tools and reloads. Source text stays in its original language.
 - Use a compact study desk, collapsible sidebar with live sources, and a chat composer that stays visible while the conversation scrolls. Select a source or subject in the chat source panel.
 - Ask in Sinhala, English, or Singlish (for example, `mkd jiwa pataka kiyanne` or `rudira patakaye karyan mnd`). Preview and edit the Sinhala interpretation before sending. Original and interpreted questions stay in history. Interpretation details expand on demand; source filters apply to history and retrieval.
@@ -29,9 +29,9 @@ For TXT, Markdown, and Word files, citations refer to numbered text sections bec
 
 ## Answering mode and limits
 
-The app works **without API keys**. Without Gemini, answers quote relevant passages and Singlish uses spelling aliases and phonetic matching against vocabulary from the selected sources. For example, `rudira patakaye karyan mnd` becomes `රුධිර පටකයේ කාර්යයන් මොනවාද`. Retrieval recognizes common function-word synonyms such as කාර්ය / කෘත්‍ය and selects relevant sections within long OCR pages. Unknown terms can match Sinhala source words through their romanized spellings; ambiguous matches are left for phonetic fallback and the editable preview. Choose Singlish explicitly for unrecognised spellings, or preview/edit the interpretation. Automatic detection is conservative so ordinary English queries remain unchanged. Singlish spellings are ambiguous; conversion is not guaranteed to be correct. A deterministic 1024-dimensional word/character hash index and a lexical relevance check are used locally. This is **not BGE-M3 semantic retrieval**. Queries work best with key terms from the document; synonyms and questions in a different language may not match.
+The library, reader and local question answering work **without API keys**. Gemini is required for standard MCQ generation. Without Gemini, answers quote relevant passages and Singlish uses spelling aliases and phonetic matching against vocabulary from the selected sources. For example, `rudira patakaye karyan mnd` becomes `රුධිර පටකයේ කාර්යයන් මොනවාද`. Retrieval recognizes common function-word synonyms such as කාර්ය / කෘත්‍ය and selects relevant sections within long OCR pages. Unknown terms can match Sinhala source words through their romanized spellings; ambiguous matches are left for phonetic fallback and the editable preview. Choose Singlish explicitly for unrecognised spellings, or preview/edit the interpretation. Automatic detection is conservative so ordinary English queries remain unchanged. Singlish spellings are ambiguous; conversion is not guaranteed to be correct. A deterministic 1024-dimensional word/character hash index and a lexical relevance check are used locally. This is **not BGE-M3 semantic retrieval**. Queries work best with key terms from the document; synonyms and questions in a different language may not match.
 
-Practice questions are source-based cloze exercises, not AI-generated exam papers. Very short notes may provide fewer than five questions or not enough material for a quiz. Only the `GEMINI_*` fields enable the optional Gemini provider. Other historical model-related environment fields remain reserved.
+Practice requires `GEMINI_API_KEY` and uses `GEMINI_QUIZ_MODEL` (default `gemini-3.1-flash-lite`). It generates standard Grade 11 MCQs in Sinhala or English using the selected sources. The old missing-word generator has been removed. Insufficient material, provider failures, and rejected questions show an actionable error; they never fall back to missing-word exercises. These are AI-generated practice questions, not official or teacher-approved examination papers. Only the `GEMINI_*` fields enable the optional Gemini provider. Other historical model-related environment fields remain reserved.
 
 OCR is imperfect, especially on handwriting, blur, complex layouts, and legacy Sinhala font encodings. Audio recognition depends on browser, microphone permissions, network, and Sinhala support; the browser's speech service may process audio externally. Typed questions are always available. No audio recording is stored by the app.
 
@@ -44,6 +44,7 @@ There is no authentication or user isolation. The scope is a trusted local share
    ```dotenv
    GEMINI_API_KEY=your-key-here
    GEMINI_MODEL=gemini-3.8-flash
+   GEMINI_QUIZ_MODEL=gemini-3.1-flash-lite
    GEMINI_TIMEOUT_SECONDS=15
    ```
 
@@ -52,9 +53,9 @@ There is no authentication or user isolation. The scope is a trusted local share
 
 With a key configured, Singlish/Latin questions may be sent to Google for interpretation. Questions with matching sources send the interpreted question and up to three retrieved excerpts to Google for a Sinhala explanation. Original PDFs and the entire library stay local; only the question and retrieved excerpts are sent to Google. Your API key stays on the server. The preview button can also call Google. Leave the key blank to keep question processing local. Browser dictation has its own external-service behavior described above.
 
-Gemini is prompted to use only the retrieved passages. Responses require valid numbered citations to supplied sources; failed, blocked, truncated, malformed, or invalid-citation responses fall back to verbatim passages with a notice. This validates citation references, not the factual correctness of every generated statement: check the linked original pages. No matching passages means no generated answer. Retrieval remains local and lexical, so paraphrases can still miss relevant sources. Practice quizzes remain source-based cloze exercises.
+Gemini is prompted to use only the retrieved passages. Responses require valid numbered citations to supplied sources; failed, blocked, truncated, malformed, or invalid-citation responses fall back to verbatim passages with a notice. This validates citation references, not the factual correctness of every generated statement: check the linked original pages. No matching passages means no generated answer. Retrieval remains local and lexical, so paraphrases can still miss relevant sources. Quiz generation uses a separate model and an independent review request. Correct answers, evidence, explanations and distractor feedback stay server-side until submission. Question and answer order vary on each generation; old saved quizzes remain gradeable.
 
-Model and structured-output implementation references: [Google Gemini models](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash), [GenerateContent REST reference](https://ai.google.dev/api/generate-content), [structured output](https://ai.google.dev/gemini-api/docs/structured-output). You can change `GEMINI_MODEL` to another compatible text model available to your key. Gemini availability also depends on Google and model capacity. The configured key was accepted by the models endpoint during the interface update, while a generation request returned HTTP 503 (high demand). Local retrieval and Singlish interpretation remained available. This does not establish successful live generation.
+Model and structured-output implementation references: [Google Gemini models](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash), [GenerateContent REST reference](https://ai.google.dev/api/generate-content), [structured output](https://ai.google.dev/gemini-api/docs/structured-output). You can change `GEMINI_MODEL` to another compatible text model available to your key. Gemini availability also depends on Google and model capacity. The configured key was accepted by the models endpoint during the interface update, while a generation request returned HTTP 503 (high demand). Local retrieval and Singlish interpretation remained available. The quiz integration separately uses the working `gemini-3.1-flash-lite` model. Provider availability can vary.
 
 ## Architecture
 
@@ -70,13 +71,14 @@ flowchart LR
     Extract --> Index[Local lexical hash vectors]
     OCR --> Index
     Index --> Database
-    Database --> Sources[Cited passages and source-based quizzes]
+    Database --> Sources[Cited passages]
+    Gemini --> Quizzes[Generated and reviewed Grade 11 MCQs]
     Sources --> Browser
 ```
 
 ## Run locally
 
-Requires Docker Desktop with its Linux engine running and Docker Compose. No local Python, database, model download, or API key is needed.
+Requires Docker Desktop with its Linux engine running and Docker Compose. No local Python, database, or model download is needed. Standard quiz generation needs a Gemini key.
 
 ```powershell
 Copy-Item .env.example .env
@@ -136,3 +138,12 @@ npm run test:e2e
 Live API workflow tests use uniquely named disposable databases and temporary storage. Existing schema checks roll back their test records. Browser tests start an isolated API on loopback port `8001`, with a disposable database and storage volume, and exercise the real production frontend on port `3000`. They clean up their test API, volume, and database afterward. Browser screenshots are saved under ignored `.artifacts/qa/`; failure screenshots and context are under `frontend/test-results/`.
 
 See [workflow verification](docs/workflows.md) for tested behavior and remaining limits. [Phase 1 evidence](docs/phase-1.md) is a historical record of the original foundation.
+
+
+## Standard MCQ practice
+
+Select a source or subject, choose Sinhala or English under **Question language**, and start practice. The server samples passages across the chapter and sends only that bounded content to Gemini. Each test has five questions and four options per question; at most two are recall questions, at least two target understanding, and at least one describes an application scenario. Correct answers are shuffled with their option explanations.
+
+Validation rejects missing-word stems, duplicate questions/options, invalid answer indices, invalid sources, ungrounded evidence, and a missing skill mix. A second Gemini call reviews question clarity, the answer key, source support, and distractor plausibility. A quote may be recovered from a substantial verbatim span when the model uses an original page number or an ellipsis; the displayed quote is always taken from the actual source text. These checks reduce poor output but do not guarantee factual correctness or official syllabus alignment. Verify important facts against the cited page.
+
+Generation and review have 30-second and 20-second provider timeouts. If a key, service, or quality check fails, the app asks you to retry or choose more material. It does not generate a lower-quality fallback. Quiz questions, answers and feedback are saved in PostgreSQL; no migration is needed. Existing saved quizzes are retained.

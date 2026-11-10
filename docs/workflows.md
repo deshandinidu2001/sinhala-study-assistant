@@ -1,5 +1,29 @@
 # Working study workflows
 
+## Standard Grade 11 MCQ update - 2026-11-10
+
+The missing-word generator is removed. Practice now uses the server-side Gemini key with a separate `GEMINI_QUIZ_MODEL`, defaulting to `gemini-3.1-flash-lite`. Sources remain restricted by the chosen document/subject, bounded, and sampled across chapter pages. A five-question test requires knowledge/understanding/application coverage, four distinct options, explanations for each option, and source evidence. A separate Gemini review must accept every question before persistence. Correct choices, explanations and evidence are omitted from the create response and released on submission only.
+
+The bilingual practice UI provides a separate question language selector, A-D options, skill labels, source references, and expandable distractor explanations. It clears stale quizzes on source changes and reports provider/quality failures without returning cloze exercises. Existing persisted quizzes still grade correctly; no schema migration is needed.
+
+Live checking confirmed the configured key can generate with `gemini-3.1-flash-lite`; `gemini-2.5-flash` returned 404 for this key. Early live drafts exposed original-page/source-number confusion and copied quotations with ellipses. Source input now uses only sequential source numbers; a bounded verbatim-span alignment repairs recoverable evidence, while unsupported output is rejected. The independent reviewer receives the aligned source references. An application label must accompany an explicit observation, experiment, or changed-condition stem.
+
+Verification for this update:
+
+| Check | Result |
+| --- | --- |
+| Backend tests including MCQ validation, review rejection, API secrecy, grading, missing-key/provider failure and isolated PostgreSQL workflows | 77 passed |
+| Frontend unit tests | 8 passed |
+| TypeScript and production Docker build | Passed |
+| Desktop/mobile browser acceptance | 24 passed |
+| Live Sinhala generation and independent review on the uploaded Grade 11 PDF | Five questions, HTTP 201, 13 seconds |
+| Live English generation and independent review on the same PDF | Five questions, HTTP 201, 27 seconds |
+| Browser rendering of that saved live quiz and real scoring endpoint | Passed, HTTP 200, no page errors or overflow |
+
+Browser-suite quiz output is mocked at the browser boundary; live generation was verified separately using the configured key and actual uploaded source. Backend integration checks exercise generation/review contracts and persistence with mocked provider responses, never live credentials. Screenshots and generated examples stay under ignored `.artifacts/`. No new claim of teacher approval or official exam equivalence is made. Previous verification tables below describe their historical implementation; statements about cloze quizzes are superseded by this update.
+
+
+
 ## Bilingual workspace and Singlish update - 2026-11-10
 
 The reported `rudira patakaye karyan mnd` question is recognized in automatic and Singlish modes. A bounded vocabulary from ready documents in the selected source/subject improves conversion of unlisted terms, using Sinhala-to-Latin phonetic comparison with conservative fuzzy matching. English question forms remain unchanged. This is still approximate transliteration, not an accuracy guarantee. Gemini interpretation uses the same local fallback.

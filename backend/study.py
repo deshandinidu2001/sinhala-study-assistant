@@ -8,7 +8,6 @@ import io
 import json
 import logging
 import math
-import random
 import re
 import subprocess
 import unicodedata
@@ -281,43 +280,3 @@ def retrieve(db: Session, question: str, subject: str | None = None, document_id
         if len(sources) == 3:
             break
     return sources
-
-
-def make_quiz(db: Session, subject: str | None, document_id: UUID | None, count: int = 5) -> list[dict]:
-    query = select(Chunk, Document).join(Document).where(Document.status == "ready")
-    if subject:
-        query = query.where(Document.subject == subject)
-    if document_id:
-        query = query.where(Document.id == document_id)
-    rows = db.execute(query.limit(1000)).all()
-    rng = random.SystemRandom()
-    candidates = []
-    vocabulary = set()
-    for chunk, document in rows:
-        vocabulary.update(w for w in words(chunk.text) if len(w) >= 4)
-        for sentence in re.split(r"(?<=[.!?।])\s+|\n+", chunk.text):
-            if 30 <= len(sentence) <= 500 and len(words(sentence)) >= 5:
-                candidates.append((sentence, chunk, document))
-    rng.shuffle(candidates)
-    result = []
-    seen = set()
-    for sentence, chunk, document in candidates:
-        if sentence in seen:
-            continue
-        choices = [w for w in words(sentence) if len(w) >= 4 and w in sentence.casefold()]
-        if not choices:
-            continue
-        answer = rng.choice(choices)
-        distractors = sorted(w for w in vocabulary if w != answer and w not in sentence.casefold())
-        if len(distractors) < 3:
-            continue
-        options = [answer] + rng.sample(distractors, 3)
-        rng.shuffle(options)
-        prompt = re.sub(re.escape(answer), "________", sentence, count=1, flags=re.IGNORECASE)
-        result.append({"prompt": "හිස්තැනට සුදුසු වචනය තෝරන්න.\n" + prompt, "options": options, "answer_index": options.index(answer), "explanation": sentence, "source": {"document_id": str(document.id), "title": document.title, "page": chunk.page, "section": document.extraction_method == "sections" or Path(document.filename).suffix.lower() in {".txt", ".md"}}})
-        seen.add(sentence)
-        if len(result) == count:
-            break
-    if not result:
-        raise StudyError("ප්‍රශ්න සෑදීමට ප්‍රමාණවත් සම්පූර්ණ වාක්‍ය නැත. වඩා දිගු පාඩම් සටහනක් එක් කරන්න.")
-    return result

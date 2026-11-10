@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     retrieval_similarity_threshold: float = Field(default=0.45, ge=0, le=1)
     gemini_api_key: SecretStr = SecretStr("")
     gemini_model: str = Field(default="gemini-3.8-flash", pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$")
+    gemini_quiz_model: str = Field(default="gemini-3.1-flash-lite", pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$")
     gemini_timeout_seconds: float = Field(default=15, ge=1, le=20)
     anthropic_api_key: SecretStr = SecretStr("")
     anthropic_model: str = "claude-sonnet-4-6"

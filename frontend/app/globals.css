@@ -115,3 +115,17 @@ input,textarea,select { color: var(--ink); border: 1px solid #d4dee5; border-rad
 @media (max-width:1100px) { .chat-layout.sources-visible { grid-template-columns: minmax(0,1fr); } .source-rail { position: absolute; inset: 0 0 0 auto; width: 290px; z-index: 15; box-shadow: -12px 0 35px #2034481a; } .chat-thread { padding: 25px; } .composer-wrap { padding: 12px 25px 15px; } }
 @media (max-width:760px) { .chat-layout { height: calc(100svh - 62px); min-height: 380px; } .chat-header { padding: 16px 20px; gap: 12px; } .chat-header h1 { font-size: 18px; } .source-toggle { font-size: 10px; min-height: 32px; padding: 5px 8px; } .chat-thread { padding: 22px 20px; } .question-bubble { max-width: 92%; font-size: 13px; padding: 11px 14px; } .answer-content > p { font-size: 13px; line-height: 2; } .answer-bubble { gap: 10px; } .answer-mark { width: 25px; height: 28px; font-size: 18px; } .chat-empty { padding-bottom: 15px; } .chat-empty-symbol { width: 65px; height: 68px; font-size: 39px; margin-bottom: 20px; } .composer-wrap { padding: 10px 15px 12px; } .question-form > textarea { font-size: 13px; padding: 14px 14px 8px; min-height: 72px; } .question-actions { gap: 3px; padding-left: 10px; } .preview-button { font-size: 10px; padding: 4px; } .composer-hint { font-size: 9px; } .composer-hint > span { display: none; } .source-rail { width: min(290px,90vw); } }
 @media (max-width:360px) { .composer-end { gap: 2px; } .input-language select { max-width: 100px; } .preview-button { font-size: 9px; padding: 3px; } .chat-thread { padding: 20px 15px; } }
+
+.practice-setup .scope-bar { grid-template-columns: 1fr 1.6fr 1fr; }
+.quiz-generation { font-size: 12px; color: #5c7d8e; padding: 18px 2px; }
+.question-skill { display: block; font-size: 10px; color: #6c8796; margin-bottom: 10px; }
+.option-letter { display: inline-grid; place-items: center; width: 23px; min-width: 23px; height: 23px; font-size: 11px; border-radius: 5px; background: #f0f4f6; color: #627c8b; }
+.quiz-options label { align-items: flex-start; gap: 10px; }
+.quiz-options input { margin-top: 6px; flex-shrink: 0; }
+.quiz-options label > span:last-of-type { overflow-wrap: anywhere; }
+.option-feedback,.quiz-evidence { margin: 14px 0; font-size: 12px; color: #617b8b; }
+.option-feedback summary,.quiz-evidence summary { cursor: pointer; width: fit-content; }
+.option-feedback ul { list-style: none; padding: 8px 0; margin: 0; }
+.option-feedback li { margin-top: 8px; }
+.quiz-evidence blockquote { border-left: 2px solid #c8dae4; padding: 10px 15px; margin: 10px 0; line-height: 2; }
+@media (max-width:960px) { .practice-setup .scope-bar { grid-template-columns: 1fr; } }

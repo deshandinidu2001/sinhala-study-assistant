@@ -33,17 +33,17 @@ def configured() -> bool:
     return bool(get_settings().gemini_api_key.get_secret_value().strip())
 
 
-def generate(instruction: str, data: dict, schema: type[BaseModel]) -> BaseModel:
+def generate(instruction: str, data: dict, schema: type[BaseModel], *, model: str | None = None, timeout: float | None = None, max_output_tokens: int = 4096) -> BaseModel:
     settings = get_settings()
     payload = {
         "systemInstruction": {"parts": [{"text": instruction}]},
         "contents": [{"role": "user", "parts": [{"text": json.dumps(data, ensure_ascii=False)}]}],
-        "generationConfig": {"responseMimeType": "application/json", "responseJsonSchema": schema.model_json_schema(), "maxOutputTokens": 4096},
+        "generationConfig": {"responseMimeType": "application/json", "responseJsonSchema": schema.model_json_schema(), "maxOutputTokens": max_output_tokens},
     }
     try:
-        with httpx.Client(timeout=settings.gemini_timeout_seconds, follow_redirects=False) as client:
+        with httpx.Client(timeout=timeout or settings.gemini_timeout_seconds, follow_redirects=False) as client:
             response = client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent",
+                f"https://generativelanguage.googleapis.com/v1beta/models/{model or settings.gemini_model}:generateContent",
                 headers={"x-goog-api-key": settings.gemini_api_key.get_secret_value()}, json=payload,
             )
             response.raise_for_status()

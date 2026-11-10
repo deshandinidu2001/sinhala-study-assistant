@@ -29,7 +29,24 @@ test.beforeEach(async ({ page }) => {
 
 test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: "wait" }); });
 
-test("upload → ready → reader → cited answer → saved history → scored quiz", async ({ page }, info) => {
+// Provider output is mocked only at the browser boundary. Backend tests exercise
+// structured generation/review, persistence, grading and answer secrecy separately.
+async function mockMcqProvider(page: Page, documentId: string) {
+  const questions = [
+    { prompt: "ශාකයක ප්‍රභාසංස්ලේෂණය සඳහා හරිතප්‍රද උපකාරී වන්නේ කෙසේද?", options: ["ආලෝක ශක්තිය අවශෝෂණය කරයි", "ජලය පසෙන් ලබාගනියි", "බීජ විසුරුවා හරියි", "පත්‍රවලින් ජලය පිට කරයි"], skill: "understanding" },
+    { prompt: "ශාකයක් අඳුරු කාමරයක තැබූ විට ආහාර නිෂ්පාදනය අඩු වීමට ප්‍රධාන හේතුව කුමක්ද?", options: ["ආලෝකය නොලැබීම", "මූල පද්ධතිය නොමැතිවීම", "පත්‍ර නොමැතිවීම", "පස නොමැතිවීම"], skill: "application" },
+    { prompt: "ප්‍රභාසංස්ලේෂණයේදී අතුරු ඵලයක් ලෙස මුදාහරින වායුව කුමක්ද?", options: ["ඔක්සිජන්", "කාබන් ඩයොක්සයිඩ්", "නයිට්‍රජන්", "හයිඩ්‍රජන්"], skill: "knowledge" },
+    { prompt: "ශාකයක මූල පද්ධතියේ කාර්යය නිවැරදිව දැක්වෙන්නේ කුමන පිළිතුරෙන්ද?", options: ["ජලය හා ඛනිජ ලවණ අවශෝෂණය", "ආලෝකය අවශෝෂණය", "වායු හුවමාරුව පාලනය", "පත්‍රවලින් ආහාර පිට කිරීම"], skill: "understanding" },
+    { prompt: "ශාක පත්‍රයක පූටිකා මගින් ඉටුකරන කාර්යය කුමක්ද?", options: ["වායු හුවමාරුව", "ඛනිජ අවශෝෂණය", "බීජ නිපදවීම", "මූල වර්ධනය"], skill: "understanding" },
+  ];
+  await page.route("**/quizzes", route => route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: "browser-mcq", grade: 11, kind: "mcq", language: "si", subject: "විද්‍යාව", questions }) }));
+  await page.route("**/quizzes/browser-mcq/submit", route => {
+    const { answers } = route.request().postDataJSON();
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ score: answers.filter((answer: number) => answer === 0).length, total: 5, questions: questions.map((question, index) => ({ ...question, answer_index: 0, selected_index: answers[index], correct: answers[index] === 0, explanation: "මූලාශ්‍රයේ අදාළ ක්‍රියාවලිය සඳහන් කර ඇත. නිවැරදි පිළිතුර එම කරුණට ගැළපේ.", option_explanations: question.options.map((_, option) => option === 0 ? "මෙය මූලාශ්‍රයේ සඳහන් කාර්යයට ගැළපේ." : "මෙය වෙනත් ක්‍රියාවලියකට අදාළ නිසා ප්‍රශ්නයට නොගැළපේ."), evidence_quote: note.slice(0, 100), source: { document_id: documentId, title: "විද්‍යාව", page: 1 } })) }) });
+  });
+}
+
+test("source workflow and standard MCQ interaction with mocked provider output", async ({ page }, info) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   await page.goto("/");
@@ -68,9 +85,13 @@ test("upload → ready → reader → cited answer → saved history → scored 
   await page.getByRole("button", { name: "ප්‍රශ්නය යවන්න", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "ඔබේ ප්‍රශ්නය", exact: true })).toHaveValue("");
   await expect(page.locator(".chat-exchange").last().locator(".answer-bubble")).toContainText("ගැළපීමක් නැත");
+  await mockMcqProvider(page, document.id);
   await page.goto(`/practice?document=${document.id}`);
   await page.getByRole("button", { name: "පුහුණුව අරඹන්න", exact: true }).click();
   await expect(page.locator(".quiz-question")).toHaveCount(5);
+  await expect(page.locator(".quiz-prompt").first()).not.toContainText("_");
+  await expect(page.locator(".quiz-prompt").first()).not.toContainText("හිස්තැන");
+  await expect(page.locator(".option-letter")).toHaveCount(20);
   for (const fieldset of await page.locator(".quiz-question").all()) await fieldset.getByRole("radio").first().check();
   await page.getByRole("button", { name: "ලකුණු බලන්න", exact: true }).click();
   await expect(page.locator(".quiz-score")).toContainText(/ඔබේ ලකුණු: \d \/ 5/);
@@ -336,4 +357,16 @@ test("informal Singlish function question finds scoped notes with the composer v
     await page.keyboard.press("Escape");
     await expect(page.getByRole("navigation", { name: "ප්‍රධාන මෙනුව" })).not.toBeVisible();
   }
+});
+
+
+test("quiz generation failure stays actionable and never shows missing-word fallback", async ({ page }) => {
+  await page.goto("/practice");
+  await page.getByRole("combobox", { name: "Interface language" }).selectOption("en");
+  await page.route("**/quizzes", route => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ detail: "Question generation is unavailable. Please try again shortly." }) }));
+  await page.getByRole("button", { name: "Start practice", exact: true }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText("Question generation is unavailable");
+  await expect(page.locator(".quiz-question")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Start practice", exact: true })).toBeEnabled();
+  await expect(page.getByRole("combobox", { name: "Question language", exact: true })).toHaveValue("en");
 });

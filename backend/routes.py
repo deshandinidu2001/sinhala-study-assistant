@@ -13,11 +13,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend import gemini
+from backend.quizzes import make_mcq_quiz, NO_KEY, UNAVAILABLE
 from backend.pdf_pages import render_page
 from backend.config import get_settings
 from backend.db.models import Chat, Chunk, Document, Quiz
 from backend.db.session import get_db
-from backend.study import EXTENSIONS, StudyError, document_folder, ingest, make_quiz, normalize, retrieve, source_path, words
+from backend.study import EXTENSIONS, StudyError, document_folder, ingest, normalize, retrieve, source_path, words
 
 router = APIRouter()
 DB = Annotated[Session, Depends(get_db)]
@@ -257,6 +258,7 @@ def ask_question(body: QuestionInput, db: DB) -> dict:
 
 
 class QuizInput(BaseModel):
+    language: Literal["si", "en"] = "si"
     subject: str | None = Field(default=None, max_length=120)
     document_id: UUID | None = None
     count: int = Field(default=5, ge=1, le=10)
@@ -264,8 +266,9 @@ class QuizInput(BaseModel):
 
 def quiz_data(quiz: Quiz) -> dict:
     # Correct answers stay on the server until the quiz is submitted.
-    return {"id": str(quiz.id), "subject": quiz.subject, "questions": [
-        {"prompt": q["prompt"], "options": q["options"]} for q in quiz.questions
+    return {"id": str(quiz.id), "subject": quiz.subject, "kind": quiz.questions[0].get("kind", "legacy") if quiz.questions else "mcq", "grade": 11,
+            "language": quiz.questions[0].get("language", "si") if quiz.questions else "si", "questions": [
+        {"prompt": q["prompt"], "options": q["options"], "skill": q.get("skill", "knowledge")} for q in quiz.questions
     ]}
 
 
@@ -274,9 +277,11 @@ def create_quiz(body: QuizInput, db: DB) -> dict:
     if body.document_id:
         require_document(db, body.document_id)
     try:
-        questions = make_quiz(db, body.subject, body.document_id, body.count)
+        questions = make_mcq_quiz(db, body.subject, body.document_id, body.count, body.language)
     except StudyError as error:
         raise HTTPException(422, str(error))
+    except gemini.GeminiUnavailable as error:
+        raise HTTPException(503, NO_KEY if str(error) == NO_KEY else UNAVAILABLE)
     quiz = Quiz(subject=body.subject or "සියලු විෂයන්", questions=questions)
     db.add(quiz)
     db.commit()

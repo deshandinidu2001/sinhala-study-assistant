@@ -70,7 +70,7 @@ def wait_document(client: TestClient, document_id: str) -> dict:
     pytest.fail("Document processing did not finish")
 
 
-def test_sinhala_upload_answer_citation_quiz_history_and_delete(client: TestClient) -> None:
+def test_sinhala_upload_answer_citation_quiz_history_and_delete(client: TestClient, monkeypatch) -> None:
     response = client.post("/documents", files={"file": ("notes.txt", NOTE.encode(), "text/plain")}, data={"title": "ප්‍රභාසංස්ලේෂණය", "subject": "විද්‍යාව"})
     assert response.status_code == 202, response.text
     document_id = response.json()["id"]
@@ -88,11 +88,24 @@ def test_sinhala_upload_answer_citation_quiz_history_and_delete(client: TestClie
     for filters in [{}, {"subject": "ඉතිහාසය"}]:
         no_match = client.post("/chat", json={"question": "ගිනිකඳු යනු කුමක්ද?", **filters}).json()
         assert no_match["mode"] == "no_match" and no_match["sources"] == []
+    from backend import gemini
+    from backend.quizzes import Review
+    from backend.tests.test_quizzes import draft
+    def generated(instruction, data, schema, **kwargs):
+        if schema is Review:
+            return Review(accepted_indices=list(range(5)))
+        result = draft(language="si")
+        for question in result.questions:
+            question.evidence_quote = data["sources"][0]["text"][:80]
+        return result
+    monkeypatch.setattr(gemini, "configured", lambda: True)
+    monkeypatch.setattr(gemini, "generate", generated)
     quiz_response = client.post("/quizzes", json={"document_id": document_id, "count": 5})
     assert quiz_response.status_code == 201, quiz_response.text
     quiz = quiz_response.json()
     assert len(quiz["questions"]) == 5
-    assert all("answer_index" not in question for question in quiz["questions"])
+    assert all(not {"answer_index", "explanation", "option_explanations", "evidence_quote", "source"} & question.keys() for question in quiz["questions"])
+    assert quiz["kind"] == "mcq" and quiz["grade"] == 11
     invalid = client.post(f"/quizzes/{quiz['id']}/submit", json={"answers": [99] * 5})
     assert invalid.status_code == 422
     result = client.post(f"/quizzes/{quiz['id']}/submit", json={"answers": [0] * 5}).json()
@@ -290,3 +303,21 @@ def test_function_question_does_not_return_other_tissue_functions(client: TestCl
     assert chat["mode"] == "extractive"
     assert len(chat["sources"]) == 1 and chat["sources"][0]["page"] == 1
     assert "පරිවහනය" in chat["answer"]
+
+
+def test_mcq_api_missing_key_scope_and_failed_generation(client: TestClient, monkeypatch):
+    from backend import gemini
+    from backend.db.models import Quiz
+    document = client.post("/documents/text", json={"title": "Science", "content": NOTE, "subject": "Science"}).json()
+    assert wait_document(client, document["id"])["status"] == "ready"
+    body = {"document_id": document["id"], "language": "en"}
+    response = client.post("/quizzes", json=body)
+    assert response.status_code == 503 and "GEMINI_API_KEY" in response.json()["detail"]
+    assert client.post("/quizzes", json={**body, "subject": "History"}).status_code == 422
+    monkeypatch.setattr(gemini, "configured", lambda: True)
+    def unavailable(*args, **kwargs):
+        raise gemini.GeminiUnavailable
+    monkeypatch.setattr(gemini, "generate", unavailable)
+    assert client.post("/quizzes", json=body).status_code == 503
+    with Session(get_engine()) as db:
+        assert db.scalars(select(Quiz)).all() == []

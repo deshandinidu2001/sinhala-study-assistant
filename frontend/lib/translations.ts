@@ -1,5 +1,9 @@
 // UI copy only. Uploaded source text is never passed through this dictionary.
 export const messages: Record<string, string> = {
+  "බහුවරණ ප්‍රශ්න සඳහා .env ගොනුවේ GEMINI_API_KEY එක් කර backend නැවත අරඹන්න.": "Add GEMINI_API_KEY to .env and recreate the backend to generate MCQs.",
+  "ප්‍රශ්න සෑදීමේ සේවාව දැනට නොමැත. මඳ වේලාවකින් නැවත උත්සාහ කරන්න.": "Question generation is unavailable. Please try again shortly.",
+  "හොඳ ප්‍රශ්න සෑදීමට ප්‍රමාණවත් පාඩම් අන්තර්ගතයක් නැත. දිගු සටහනක් හෝ වෙනත් ලේඛනයක් තෝරන්න.": "There is not enough material for a good quiz. Choose a longer note or another source.",
+  "ප්‍රශ්නවල ගුණාත්මකභාවය තහවුරු කළ නොහැකි විය. නැවත උත්සාහ කරන්න.": "The generated questions did not pass quality checks. Please try again.",
   "එක් කළ නොහැක.": "Could not add this file.",
   "එක් කරන ආකාරය": "Add a source",
   "ලේඛන එකතුව": "Source library",
