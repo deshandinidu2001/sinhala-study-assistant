@@ -1,67 +1,23 @@
 "use client";
-
-import { motion, useReducedMotion } from "framer-motion";
-import { Icon } from "@/components/icon";
 import Link from "next/link";
 import { useEffect } from "react";
+import { useLanguage } from "@/lib/language";
 import { useDocuments } from "@/lib/use-documents";
+import { Icon } from "@/components/icon";
 
 export function StudyOverview() {
-  const reduceMotion = useReducedMotion();
+  const { t } = useLanguage();
   const { documents, loading, error } = useDocuments();
   useEffect(() => {
     if (window.location.hash === "#practice") window.location.replace("/practice");
     else if (window.location.hash === "#library") window.location.replace("/documents");
   }, []);
-  return (
-    <div className="overview">
-      <section className="page-intro" aria-labelledby="welcome-heading">
-        <p className="welcome">ආයුබෝවන්!</p>
-        <h1 id="welcome-heading">අද අපි මොනවද ඉගෙන ගන්නේ?</h1>
-        <p>ඔබේ සටහන් හා ප්‍රශ්න පත්‍ර සමඟ, දැනුම තවත් පැහැදිලි කරගන්න.</p>
-      </section>
-
-      <motion.section className="hero-panel" initial={reduceMotion ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }} aria-labelledby="hero-heading">
-        <div className="hero-copy">
-          <span className="hero-kicker"><span className="tiny-book"><Icon name="book" size={16} /></span>ඔබේ පාඩමට ළඟින්ම</span>
-          <h2 id="hero-heading">දැනුම ගොඩනගන්න.<br />විශ්වාසයෙන් ඉදිරියට යන්න.</h2>
-          <p>සටහනක් කියවන්න. ප්‍රශ්නයක් අහන්න.<br />පිළිතුර හමු වූ පිටුවත් සමඟම තේරුම් ගන්න.</p>
-          <div className="hero-actions"><Link className="primary-button" href="/documents">ලේඛනයක් එක් කරන්න<Icon name="arrow" size={18} /></Link><a className="text-button" href="#study-method">ඉගෙන ගන්නා ආකාරය</a></div>
-        </div>
-        <div className="study-art" role="img" aria-label="සිංහල සටහන් පොතක් සහ ප්‍රශ්න පත්‍රයක්">
-          <div className="art-orbit" />
-          <div className="paper-sheet paper-back"><span>ප්‍රශ්න පත්‍ර</span><i /><i /><i /><i /><div className="paper-checkboxes"><b /><b /><b /></div></div>
-          <div className="notebook"><div className="notebook-spine" /><div className="notebook-content"><span>මගේ</span><strong>සටහන්</strong><div className="notebook-emblem"><Icon name="leaf" size={35} /></div><small>දැනුමට නව පිටුවක්</small></div></div>
-          <div className="art-bookmark" />
-          <div className="art-source"><span><Icon name="check" size={16} /></span>පිටුවෙන් පිටුව, පැහැදිලිව</div>
-        </div>
-      </motion.section>
-
-      <section id="study-method" className="method-section" aria-labelledby="method-heading">
-        <div className="section-heading"><h2 id="method-heading">පාඩමෙන් අවබෝධයට</h2><span>පියවර තුනකින්</span></div>
-        <div className="method-grid">
-          <article><span className="method-icon blue"><Icon name="document" /></span><div><h3>ලේඛන එකතු කරන්න</h3><p>ඔබේ සිංහල සටහන් සහ පසුගිය ප්‍රශ්න පත්‍ර එක තැනකට ගන්න.</p></div></article>
-          <article><span className="method-icon green"><Icon name="chat" /></span><div><h3>සිංහලෙන් ප්‍රශ්න අහන්න</h3><p>ඔබේ පාඩමේ අපැහැදිලි තැන්, ඔබේම වචනවලින් විමසන්න.</p></div></article>
-          <article><span className="method-icon amber"><Icon name="source" /></span><div><h3>මූලාශ්‍රයත් බලන්න</h3><p>පිළිතුරට අදාළ ලේඛනය සහ පිටුව සමඟ නැවත කියවා බලන්න.</p></div></article>
-        </div>
-      </section>
-
-      <div className="lower-grid">
-        <section id="library" className="library-panel" aria-labelledby="library-heading">
-          <div className="section-heading"><h2 id="library-heading">ඔබේ ලේඛන එකතුව</h2><Icon name="book" size={20} /></div>
-          {error && <p className="notice error" role="alert">{error}</p>}
-          {loading ? <p className="empty-state" role="status">ලේඛන ලබාගනිමින්…</p> : documents.length ? <div className="recent-documents">{documents.slice(0, 3).map(d => <Link key={d.id} href={d.status === "ready" ? `/documents/${d.id}` : "/documents"}><Icon name="document" size={20} /><span><strong>{d.title}</strong><small>{d.subject} · {d.status === "ready" ? `${d.page_count} ${/\.(txt|md|docx)$/i.test(d.filename) ? "කොටස්" : "පිටු"}` : d.status === "failed" ? "සැකසීම අසාර්ථකයි" : "සකසමින්…"}</small></span></Link>)}<Link className="text-button" href="/documents">සියලු ලේඛන බලන්න ({documents.length})</Link></div> : <div className="library-empty"><span className="empty-illustration"><Icon name="document" size={31} /><span>+</span></span><h3>අලුත් පාඩමකට ඉඩක්</h3><p>ඔබේ සටහන් සහ ප්‍රශ්න පත්‍ර සඳහා<br />වෙන් වූ අධ්‍යයන අවකාශය.</p><Link className="secondary-button" href="/documents">පළමු ලේඛනය එක් කරන්න</Link></div>}
-          <p className="library-footnote"><Icon name="check" size={15} />පිළිතුරු ඔබේ ලේඛන ඇසුරින් පමණයි</p>
-        </section>
-        <section id="practice" className="practice-panel" aria-labelledby="practice-heading">
-          <span className="practice-icon"><Icon name="quiz" size={26} /></span>
-          <h2 id="practice-heading">කියවූ දේ මතකද?</h2>
-          <p>පාඩම අවසානයේ ප්‍රශ්න පුහුණුවෙන් ඔබේ අවබෝධය පරීක්ෂා කරගන්න.</p>
-          <div className="practice-detail"><span><Icon name="check" size={16} />බහුවරණ ප්‍රශ්න</span><span><Icon name="check" size={16} />පැහැදිලි කිරීම් සහ මූලාශ්‍ර</span></div>
-          <Link className="secondary-button" href="/practice">ප්‍රශ්න පුහුණුවට යන්න<Icon name="arrow" size={16} /></Link>
-          <p className="practice-note">ඔබේ සටහන්, ඔබේ පුහුණුවේ පදනමයි.</p>
-        </section>
-      </div>
-    </div>
-  );
+  return <div className="overview desk-page">
+    <div className="page-intro desk-heading"><div><h1>{t("අධ්‍යයන මේසය", "Study desk")}</h1><p>{t("ඔබේ සටහන් සමඟ නැවත පටන් ගන්න.", "Pick up where you left off.")}</p></div><Link className="primary-button" href="/documents#upload"><Icon name="plus" size={18} />{t("ලේඛනයක් එක් කරන්න")}</Link></div>
+    <div className="desk-actions"><Link href="/chat" className="desk-action ask-action"><span className="action-glyph"><Icon name="chat" size={27} /></span><span><h2>{t("සටහන්වලින් ප්‍රශ්නයක් අහන්න", "A question worth asking.")}</h2><p>{t("සිංහල, Singlish හෝ English", "Sinhala, Singlish or English")}</p></span><Icon name="arrow" size={21} /></Link><Link href="/practice" className="desk-action"><span className="action-glyph"><Icon name="quiz" size={25} /></span><span><h2>{t("දැනුම පරීක්ෂා කරන්න", "Put it into practice.")}</h2><p>{t("ඔබේ සටහන් ඇසුරින් ප්‍රශ්න", "A short quiz from your notes")}</p></span><Icon name="arrow" size={21} /></Link></div>
+    <section className="desk-library" aria-labelledby="recent-heading"><div className="section-heading"><h2 id="recent-heading">{t("මෑත ලේඛන", "Recent sources")}</h2><Link href="/documents" className="text-button">{t("සියල්ල බලන්න", "View all")}<Icon name="arrow" size={15} /></Link></div>
+      {error && <p className="notice error" role="alert">{t(error)}</p>}
+      {loading ? <p className="empty-state" role="status">{t("ලේඛන ලබාගනිමින්…")}</p> : documents.length ? <div className="notebook-grid">{documents.slice(0, 6).map((document, i) => <Link href={document.status === "ready" ? `/documents/${document.id}` : "/documents"} className={`notebook-card cover-${i % 4}`} key={document.id}><div className="notebook-card-cover"><span>{document.filename.split(".").pop()?.toUpperCase()}</span><Icon name="document" size={36} /><span className="cover-lines" /></div><div className="notebook-card-info"><h3>{document.title}</h3><p>{document.subject} <span>· {document.page_count} {t("පිටු")}</span></p><span className={`document-status ${document.status}`}>{t(document.status === "ready" ? "සූදානම්" : document.status === "failed" ? "සැකසීම අසාර්ථකයි" : "සකසමින්…")}</span></div></Link>)}</div> : <div className="desk-empty"><Icon name="book" size={40} /><h3>{t("ඔබේ පළමු පාඩම එක් කරන්න")}</h3><p>{t("PDF එකක් එක් කරන්න හෝ සටහනක් ලියන්න.", "Add a PDF or paste a note to begin.")}</p><Link href="/documents#upload" className="secondary-button">{t("ලේඛනයක් එක් කරන්න")}</Link></div>}
+    </section>
+  </div>;
 }

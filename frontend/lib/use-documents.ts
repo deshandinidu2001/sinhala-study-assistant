@@ -16,6 +16,7 @@ export function useDocuments() {
     } finally { if (mounted.current) setLoading(false); }
   }, []);
   useEffect(() => { mounted.current = true; void refresh(); return () => { mounted.current = false; }; }, [refresh]);
+  useEffect(() => { const reload = () => void refresh(); window.addEventListener("akura:sources", reload); return () => window.removeEventListener("akura:sources", reload); }, [refresh]);
   useEffect(() => {
     if (!documents.some(d => d.status === "pending" || d.status === "processing")) return;
     const timer = setInterval(() => void refresh(), 2000);

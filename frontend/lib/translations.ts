@@ -1,5 +1,11 @@
 // UI copy only. Uploaded source text is never passed through this dictionary.
 export const messages: Record<string, string> = {
+  "එක් කළ නොහැක.": "Could not add this file.",
+  "එක් කරන ආකාරය": "Add a source",
+  "ලේඛන එකතුව": "Source library",
+  "නැවත පූරණය කරන්න": "Refresh",
+  "PDF පිටුව පූරණය කළ නොහැක.": "Could not load this PDF page.",
+  "හෝ ඉහත මුල් ගොනුව විවෘත කරන්න.": "Or open the original file.",
   "නැවත උත්සාහ කරන්න": "Try again",
   "සියලු විෂයන්": "All subjects",
   "සියලු සූදානම් ලේඛන": "All sources",

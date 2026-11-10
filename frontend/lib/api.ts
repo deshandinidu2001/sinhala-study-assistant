@@ -41,6 +41,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
     try { if (localStorage.getItem("akura-language") === "en") detail = translate(detail); } catch { /* Storage is optional. */ }
     throw new ApiError(response.status, detail);
   }
+  if (options.method && options.method !== "GET" && path.startsWith("/documents") && typeof window !== "undefined") window.dispatchEvent(new Event("akura:sources"));
   return response.status === 204 ? undefined as T : response.json() as Promise<T>;
 }
 
