@@ -203,13 +203,55 @@ def ingest(document_id: UUID) -> None:
                 db.commit()
 
 
+def matching_term(word: str) -> str:
+    word = word.replace("\u200d", "")
+    # Common textbook wording and OCR variants; these are intent synonyms,
+    # not extra answer content.
+    if word.startswith(("කාර්ය", "කෘත්")):
+        return "කාර්ය"
+    if word.startswith(("රුධිර", "රැධිර")):
+        return "රුධිර"
+    return word
+
+
+def matches(query: str, term: str) -> bool:
+    return query == term or (min(len(query), len(term)) >= 4 and (query.startswith(term) or term.startswith(query)))
+
+
 def relevance(question: str, passage: str) -> float:
-    query = {word.replace("\u200d", "") for word in words(question)}
-    terms = {word.replace("\u200d", "") for word in words(passage)}
+    query = {matching_term(word) for word in words(question)}
+    terms = {matching_term(word) for word in words(passage)}
     if not query or not terms:
         return 0
-    matched = sum(any(q == t or (min(len(q), len(t)) >= 4 and (q.startswith(t) or t.startswith(q))) for t in terms) for q in query)
-    return matched / len(query)
+    return sum(any(matches(q, term) for term in terms) for q in query) / len(query)
+
+
+def source_excerpt(question: str, text: str) -> str:
+    # OCR can collapse an entire page into one long sentence. Score overlapping
+    # word windows so a function list late on the page is not cut off by [:1100].
+    tokens = text.split()
+    if len(text) <= 1100:
+        return text
+    terms = {matching_term(word) for word in words(question)}
+    if "කාර්ය" in terms:
+        headings = [index for index, token in enumerate(tokens) if matching_term(token.strip(".,:;-")) == "කාර්ය"]
+        if headings:
+            index = max(headings, key=lambda position: relevance(question, " ".join(tokens[max(0, position - 2):position + 1])))
+            heading = " ".join(tokens[max(0, index - 2):index + 1])
+            if relevance(question, heading) >= 0.65:
+                return " ".join(tokens[max(0, index - 2):index + 100])[:1100]
+    windows = []
+    for start in range(0, len(tokens), 15):
+        content = " ".join(tokens[start:start + 100])
+        if content:
+            windows.append(content[:1100])
+    terms = {matching_term(word) for word in words(question)}
+    def score(content):
+        passage = [matching_term(word) for word in words(content)]
+        coverage = relevance(question, content)
+        density = sum(sum(matches(q, term) for term in passage) ** 0.5 for q in terms) / max(1, len(passage)) ** 0.5
+        return coverage, density
+    return max(windows, key=score)
 
 
 def retrieve(db: Session, question: str, subject: str | None = None, document_id: UUID | None = None) -> list[dict]:
@@ -219,17 +261,22 @@ def retrieve(db: Session, question: str, subject: str | None = None, document_id
     if document_id:
         query = query.where(Document.id == document_id)
     candidates = db.execute(query.order_by(Chunk.embedding.cosine_distance(vector(question))).limit(80)).all()
-    ranked = sorted(candidates, key=lambda row: relevance(question, row[0].text), reverse=True)
+    def rank(row):
+        excerpt = source_excerpt(question, row[0].text)
+        terms = {matching_term(word) for word in words(question)}
+        passage = [matching_term(word) for word in words(excerpt)]
+        density = sum(sum(matches(q, term) for term in passage) ** 0.5 for q in terms) / max(1, len(passage)) ** 0.5
+        return relevance(question, excerpt), density
+    ranked = sorted(candidates, key=rank, reverse=True)
     sources = []
     seen = set()
+    minimum = 0.95 if "කාර්ය" in {matching_term(word) for word in words(question)} else 0.3
     for chunk, document in ranked:
-        score = relevance(question, chunk.text)
-        if score < 0.3 or (document.id, chunk.page) in seen:
+        score = relevance(question, source_excerpt(question, chunk.text))
+        if score < minimum or (document.id, chunk.page) in seen:
             continue
         seen.add((document.id, chunk.page))
-        sentences = re.split(r"(?<=[.!?।])\s+|\n+", chunk.text)
-        best = sorted(enumerate(sentences), key=lambda pair: relevance(question, pair[1]), reverse=True)[:3]
-        excerpt = " ".join(sentence for _, sentence in sorted(best))[:1100]
+        excerpt = source_excerpt(question, chunk.text)
         sources.append({"document_id": str(document.id), "title": document.title, "filename": document.filename, "page": chunk.page, "excerpt": excerpt, "ocr": document.extraction_method in {"ocr", "text+ocr"}, "section": document.extraction_method == "sections" or Path(document.filename).suffix.lower() in {".txt", ".md"}})
         if len(sources) == 3:
             break

@@ -82,3 +82,10 @@ def test_explanation_requires_real_source_references():
     with patch.object(gemini, "generate") as generate:
         assert gemini.explain("unrelated question", []) is None
         generate.assert_not_called()
+
+
+def test_english_answer_language_is_passed_to_provider():
+    result = gemini.GroundedAnswer(supported=True, answer="Blood carries oxygen. [1]", citations=[1])
+    with patch.object(gemini, "generate", return_value=result) as generate:
+        assert gemini.explain("රුධිර පටක?", [{"excerpt": "රුධිර පටක ඔක්සිජන් ගෙන යයි."}], "en") == result.answer
+        assert "clear English" in generate.call_args.args[0]

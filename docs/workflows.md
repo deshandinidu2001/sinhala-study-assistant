@@ -1,5 +1,33 @@
 # Working study workflows
 
+## Bilingual workspace and Singlish update - 2026-11-10
+
+The reported `rudira patakaye karyan mnd` question is recognized in automatic and Singlish modes. A bounded vocabulary from ready documents in the selected source/subject improves conversion of unlisted terms, using Sinhala-to-Latin phonetic comparison with conservative fuzzy matching. English question forms remain unchanged. This is still approximate transliteration, not an accuracy guarantee. Gemini interpretation uses the same local fallback.
+
+English/Sinhala interface selection persists in browser storage and updates the HTML language. Source text is preserved. New Gemini explanations follow the interface language; local passage answers keep the original excerpts. Chat history retains the source scope as metadata without a schema change.
+
+The redesigned study desk has a compact collapsible sidebar and real source links. Chat scrolls independently of its composer, shows recent scoped history, and offers an optional source panel. Interpretation, provider/OCR details, and older questions are expandable. The library, reader, practice, fallback pages and status controls use the same bilingual visual system.
+
+The configured Gemini key was accepted by the models listing (HTTP 200), but generation returned HTTP 503 with a high-demand message. No secret was printed or committed. This is a provider limitation, not proof of successful live generation. Local Singlish and source retrieval are tested independently of provider availability.
+
+The retrieval update also matches the textbook intent synonyms කාර්ය / කෘත්‍ය and the OCR variant රැධිර / රුධිර. Function questions select a nearby heading and its following passage instead of truncating the first part of a long OCR sentence. The actual uploaded PDF now ranks page 12's blood-tissue functions passage first, including transport, protection and homeostasis.
+
+Final verification:
+
+| Check | Result |
+| --- | --- |
+| Python 3.11 backend and isolated PostgreSQL workflows | 62 passed |
+| Frontend component/unit tests | 8 passed |
+| TypeScript and Linux production build | Passed |
+| Desktop/mobile browser acceptance, including bilingual tools, scoped informal Singlish, 320px navigation and composer visibility | 22 passed |
+| Alembic schema comparison | No new upgrade operations |
+| Actual uploaded PDF, reported Singlish phrase | Interpreted correctly; page 12 functions passage ranks first |
+| Provider connectivity | Key accepted for model listing; generation returned 503 high demand |
+
+UI screenshots were reviewed in both languages at desktop and mobile sizes under ignored `.artifacts/qa/`. Browser test databases and storage are disposable. The actual-workspace smoke request adds a cited question to existing history; no original uploads were removed.
+
+
+
 ## PDF, Singlish, and Gemini update - 2026-11-10
 
 Original PDFs now render as page images using embedded fonts and artwork, with page navigation, full PDF access, and an extracted-text view. FM/DL legacy Sinhala font detection triggers OCR even when a Unicode map returns Latin-looking text. Reprocessing preserves the original document ID and replaces its search chunks. Older quoted chat answers retain their original text.

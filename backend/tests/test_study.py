@@ -111,3 +111,22 @@ def test_legacy_font_with_latin_unicode_map_uses_ocr(tmp_path: Path) -> None:
     assert render_page(path, 2).startswith(b"\x89PNG")
     with pytest.raises(IndexError):
         render_page(path, 0)
+
+
+def test_function_synonyms_and_late_ocr_passage_are_not_truncated():
+    from backend.study import source_excerpt
+    question = "රුධිර පටකයේ කාර්යයන් මොනවාද"
+    background = "සම්බන්ධක පටක සෛල කාටිලේජ තන්තු පූරකය. " * 50
+    functions = "රුධිර පටකයේ කෘත්‍ය ද්‍රව්‍ය පරිවහනය මගින් ඔක්සිජන් සහ හෝර්මෝන රැගෙන යයි. සුදු රුධිර සෛල විෂබීජ විනාශ කරයි. සමස්ථිතිය පවත්වා ගනියි."
+    excerpt = source_excerpt(question, background + functions)
+    assert "ඔක්සිජන්" in excerpt and "විෂබීජ" in excerpt
+    assert relevance(question, functions) == 1
+
+
+def test_function_heading_precedes_repeated_feature_text():
+    from backend.study import source_excerpt
+    background = "රුධිර පටකයේ ලක්ෂණ රුධිර සෛල ප්ලාස්මය තුළ පවතී. " * 35
+    text = background + "රුධිර පටකයේ කෘත්‍ය ද්‍රව්‍ය පරිවහනය හා ආරක්ෂාව සපයයි. සුදු රුධිර සෛල විෂබීජ විනාශ කරයි."
+    excerpt = source_excerpt("රුධිර පටකයේ කාර්යයන් මොනවාද", text)
+    assert "පරිවහනය" in excerpt and "විෂබීජ" in excerpt
+    assert len(excerpt) < 1100

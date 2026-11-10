@@ -266,3 +266,27 @@ def test_informal_singlish_uses_selected_source_vocabulary(client: TestClient) -
         assert chat["mode"] == "extractive" and chat["sources"][0]["document_id"] == note["id"]
     unrelated = client.post("/chat", json={"question": "gini kandu mokakda", "document_id": note["id"]}).json()
     assert unrelated["mode"] == "no_match"
+
+
+def test_english_answer_interface_keeps_original_source_content(client: TestClient) -> None:
+    note = client.post("/documents/text", json={"title": "විද්‍යාව", "content": NOTE}).json()
+    assert wait_document(client, note["id"])["status"] == "ready"
+    body = {"question": "harithaprada kiyanne mokakda", "answer_language": "en", "document_id": note["id"]}
+    chat = client.post("/chat", json=body).json()
+    assert chat["mode"] == "extractive"
+    assert chat["answer"].startswith("Relevant passages")
+    assert "හරිතප්‍රද" in chat["sources"][0]["excerpt"]
+    assert chat["document_id"] == note["id"]
+    unmatched = client.post("/chat", json={**body, "question": "gini kandu kiyanne mokakda"}).json()
+    assert unmatched["mode"] == "no_match" and unmatched["answer"].startswith("No matching passages")
+
+
+def test_function_question_does_not_return_other_tissue_functions(client: TestClient) -> None:
+    content = ("රුධිර පටකයේ කෘත්‍ය වන්නේ පෝෂණ ද්‍රව්‍ය පරිවහනය කිරීම සහ දේහයට ආරක්ෂාව සැපයීමයි.\f"
+               "පේශි පටකයේ කෘත්‍ය වන්නේ සංකෝචනය මගින් චලනය ඇති කිරීමයි.")
+    note = client.post("/documents", files={"file": ("tissues.txt", content.encode(), "text/plain")}).json()
+    assert wait_document(client, note["id"])["status"] == "ready"
+    chat = client.post("/chat", json={"question": "rudira patakaye karyan mnd", "document_id": note["id"]}).json()
+    assert chat["mode"] == "extractive"
+    assert len(chat["sources"]) == 1 and chat["sources"][0]["page"] == 1
+    assert "පරිවහනය" in chat["answer"]

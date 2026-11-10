@@ -13,12 +13,14 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { documents } = useDocuments();
   const [collapsed, setCollapsed] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const [open, setOpen] = useState(false);
-  useEffect(() => { setOpen(false); }, [pathname]);
+  useEffect(() => { const close = () => setOpen(false); window.addEventListener("popstate", close); return () => window.removeEventListener("popstate", close); }, []);
   useEffect(() => { try { setCollapsed(localStorage.getItem("akura-sidebar") === "collapsed"); } catch {} }, []);
   useEffect(() => {
     if (!open) return;
-    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") { setOpen(false); document.querySelector<HTMLButtonElement>(".mobile-menu")?.focus(); } };
     window.addEventListener("keydown", escape);
     return () => window.removeEventListener("keydown", escape);
   }, [open]);
@@ -29,7 +31,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   return <div className={`workspace${collapsed ? " sidebar-collapsed" : ""}`}>
     <a className="skip-link" href="#main">{t("ප්‍රධාන අන්තර්ගතයට යන්න", "Skip to content")}</a>
     {open && <button className="sidebar-backdrop" aria-label={t("මෙනුව වසන්න", "Close menu")} onClick={() => setOpen(false)} />}
-    <aside id="workspace-sidebar" className={`sidebar${open ? " sidebar-open" : ""}`} aria-label={t("අධ්‍යයන අවකාශය", "Study workspace")}>
+    <aside onClick={event => { if ((event.target as HTMLElement).closest("a")) setOpen(false); }} id="workspace-sidebar" className={`sidebar${open ? " sidebar-open" : ""}`} aria-label={t("අධ්‍යයන අවකාශය", "Study workspace")}>
       <div className="brand-row"><Link className="brand" href="/" aria-label={t("අකුර මුල් පිටුව", "Akura home")}><span className="brand-symbol">අ</span><strong>{t("අකුර", "Akura")}<span className="brand-period">.</span></strong></Link><button className="icon-button collapse-button" onClick={toggleSidebar} aria-label={collapsed ? t("පැති තීරුව විවෘත කරන්න", "Expand sidebar") : t("පැති තීරුව හකුළන්න", "Collapse sidebar")}><Icon name="panel" size={19} /></button><button className="icon-button mobile-close" onClick={() => setOpen(false)} aria-label={t("මෙනුව වසන්න", "Close menu")}><Icon name="close" size={20} /></button></div>
       <Link href="/documents#upload" className="sidebar-add" aria-label={t("ලේඛනයක් එක් කරන්න")}><Icon name="plus" size={19} /><span>{t("ලේඛනයක් එක් කරන්න")}</span></Link>
       <WorkspaceNav />
@@ -39,6 +41,6 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
       </div>
       <div className="sidebar-bottom"><ConnectionStatus /><span className="local-label">{t("දේශීය අවකාශය", "Local workspace")}</span></div>
     </aside>
-    <div className="main-column"><header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" aria-label={t("මෙනුව විවෘත කරන්න", "Open menu")} aria-expanded={open} aria-controls="workspace-sidebar" onClick={() => setOpen(value => !value)}><Icon name="menu" size={21} /></button><span className="topbar-brand">{t("අකුර", "Akura")}</span><span className="breadcrumb-slash">/</span><span>{title}</span></div><div className="topbar-right"><label className="language-switch"><span aria-hidden="true">අ / A</span><select aria-label="Interface language" value={language} onChange={e => setLanguage(e.target.value as "si" | "en")}><option value="si">සිංහල</option><option value="en">English</option></select></label></div></header><main id="main" tabIndex={-1}>{children}</main></div>
+    <div className="main-column"><header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" disabled={!mounted} aria-label={t("මෙනුව විවෘත කරන්න", "Open menu")} aria-expanded={open} aria-controls="workspace-sidebar" onClick={() => setOpen(value => !value)}><Icon name="menu" size={21} /></button><span className="topbar-brand">{t("අකුර", "Akura")}</span><span className="breadcrumb-slash">/</span><span>{title}</span></div><div className="topbar-right"><label className="language-switch"><span aria-hidden="true">අ / A</span><select aria-label="Interface language" value={language} onChange={e => setLanguage(e.target.value as "si" | "en")}><option value="si">සිංහල</option><option value="en">English</option></select></label></div></header><main id="main" tabIndex={-1}>{children}</main></div>
   </div>;
 }

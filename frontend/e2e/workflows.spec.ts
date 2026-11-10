@@ -33,8 +33,8 @@ test("upload → ready → reader → cited answer → saved history → scored 
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   await page.goto("/");
-  await page.getByRole("link", { name: "ලේඛනයක් එක් කරන්න", exact: true }).click();
-  await expect(page).toHaveURL(/\/documents$/);
+  await page.getByRole("main").getByRole("link", { name: "ලේඛනයක් එක් කරන්න", exact: true }).first().click();
+  await expect(page).toHaveURL(/\/documents(?:#upload)?$/);
   const title = `ජීව විද්‍යාව ${info.project.name}`;
   await page.getByPlaceholder("උදා: ප්‍රභාසංස්ලේෂණය").fill(title);
   await page.getByPlaceholder("උදා: විද්‍යාව").fill("විද්‍යාව");
@@ -67,7 +67,7 @@ test("upload → ready → reader → cited answer → saved history → scored 
   await page.getByLabel("ඔබේ ප්‍රශ්නය", { exact: true }).fill("ගිනිකඳු යනු කුමක්ද?");
   await page.getByRole("button", { name: "ප්‍රශ්නය යවන්න", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "ඔබේ ප්‍රශ්නය", exact: true })).toHaveValue("");
-  await expect(page.locator(".chat-exchange").last().locator(".answer-bubble")).toContainText("තොරතුරු හමු නොවීය");
+  await expect(page.locator(".chat-exchange").last().locator(".answer-bubble")).toContainText("ගැළපීමක් නැත");
   await page.goto(`/practice?document=${document.id}`);
   await page.getByRole("button", { name: "පුහුණුව අරඹන්න", exact: true }).click();
   await expect(page.locator(".quiz-question")).toHaveCount(5);
@@ -168,10 +168,12 @@ test("legacy links reach real tools and narrow screens do not overflow", async (
   await page.goto("/#practice");
   await expect(page).toHaveURL(/\/practice$/);
   await noOverflow(page);
+  await page.getByRole("button", { name: "මෙනුව විවෘත කරන්න", exact: true }).click();
   await page.getByRole("navigation", { name: "ප්‍රධාන මෙනුව" }).getByRole("link", { name: "මගේ ලේඛන", exact: true }).click();
-  await expect(page).toHaveURL(/\/documents$/);
+  await expect(page).toHaveURL(/\/documents(?:#upload)?$/);
   await noOverflow(page);
-  await page.getByRole("navigation", { name: "ප්‍රධාන මෙනුව" }).getByRole("link", { name: "ප්‍රශ්න හා පිළිතුරු", exact: true }).click();
+  await page.getByRole("button", { name: "මෙනුව විවෘත කරන්න", exact: true }).click();
+  await page.getByRole("navigation", { name: "ප්‍රධාන මෙනුව" }).getByRole("link", { name: "සංවාදය", exact: true }).click();
   await noOverflow(page);
 });
 
@@ -266,11 +268,72 @@ test("Singlish preview stays editable and retrieves a Sinhala cited answer", asy
   await page.getByRole("button", { name: "ප්‍රශ්නය යවන්න", exact: true }).click();
   await expect(question).toHaveValue("");
   const exchange = page.locator(".chat-exchange").last();
-  await expect(exchange).toContainText("සිංහලෙන්: මොකක්ද ජීව පටක කියන්නේ");
+  await expect(exchange).toContainText("මොකක්ද ජීව පටක කියන්නේ");
   await expect(exchange.locator(".answer-bubble")).toContainText("සෛල සමූහයකි");
   await expect(exchange.locator(".source-link")).toHaveAttribute("href", `/documents/${id}?page=1`);
   await noOverflow(page);
   await page.screenshot({ path: `../.artifacts/qa/${info.project.name}-singlish.png`, fullPage: true });
   await page.reload();
-  await expect(page.locator(".chat-exchange").last()).toContainText("සිංහලෙන්: මොකක්ද ජීව පටක කියන්නේ");
+  await expect(page.locator(".chat-exchange").last()).toContainText("මොකක්ද ජීව පටක කියන්නේ");
+});
+
+
+test("English and Sinhala switch across all tools and preserve original notes", async ({ page, request }, info) => {
+  const response = await request.post("http://localhost:8001/documents/text", { data: { title: "Language test note", content: note } });
+  const { id } = await response.json();
+  await expect.poll(async () => (await (await request.get(`http://localhost:8001/documents/${id}`)).json()).status).toBe("ready");
+  await page.goto("/documents");
+  await page.getByRole("combobox", { name: "Interface language" }).selectOption("en");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sources");
+  await expect(page.getByRole("button", { name: "Upload file", exact: true })).toBeVisible();
+  await expect(page.getByRole("searchbox", { name: "Search sources", exact: true })).toBeVisible();
+  await page.goto(`/documents/${id}`);
+  await expect(page.getByRole("link", { name: "Ask about this source", exact: true })).toBeVisible();
+  await expect(page.locator("article.source-page")).toContainText("ප්‍රභාසංස්ලේෂණය");
+  await page.goto(`/practice?document=${id}`);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Practice");
+  await expect(page.getByRole("button", { name: "Start practice", exact: true })).toBeVisible();
+  await page.goto(`/chat?document=${id}`);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Ask your notes");
+  await expect(page.getByRole("textbox", { name: "Your question", exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Ask your notes");
+  await noOverflow(page);
+  await page.screenshot({ path: `../.artifacts/qa/${info.project.name}-workspace-en.png` });
+  await page.getByRole("combobox", { name: "Interface language" }).selectOption("si");
+  await expect(page.locator("html")).toHaveAttribute("lang", "si");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("සංවාදය");
+});
+
+test("informal Singlish function question finds scoped notes with the composer visible", async ({ page, request }, info) => {
+  const response = await request.post("http://localhost:8001/documents/text", { data: { title: `රුධිර පටක ${info.project.name}`, content: "රුධිර පටකයේ කාර්යයන් වන්නේ ඔක්සිජන් හා පෝෂක ද්‍රව්‍ය ප්‍රවාහනය කිරීමයි. ශ්වසනය සෛල තුළ ශක්තිය නිදහස් කරන ක්‍රියාවලියකි." } });
+  const { id } = await response.json();
+  await expect.poll(async () => (await (await request.get(`http://localhost:8001/documents/${id}`)).json()).status).toBe("ready");
+  await page.goto(`/chat?document=${id}`);
+  const question = page.getByRole("textbox", { name: "ඔබේ ප්‍රශ්නය", exact: true });
+  await expect(question).toBeEnabled();
+  await question.fill("rudira patakaye karyan mnd");
+  await page.getByRole("button", { name: "ප්‍රශ්නය යවන්න", exact: true }).click();
+  await expect(question).toHaveValue("");
+  const exchange = page.locator(".chat-exchange").last();
+  await expect(exchange.locator(".answer-content")).toContainText("ඔක්සිජන්");
+  await expect(exchange.locator(".source-link")).toHaveAttribute("href", `/documents/${id}?page=1`);
+  const box = await question.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.y + box!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+  await noOverflow(page);
+  await page.screenshot({ path: `../.artifacts/qa/${info.project.name}-informal-singlish.png` });
+  if (info.project.name === "desktop") {
+    await page.getByRole("button", { name: "පැති තීරුව හකුළන්න", exact: true }).click();
+    await expect(page.locator(".workspace")).toHaveClass(/sidebar-collapsed/);
+    await page.reload();
+    await expect(page.locator(".workspace")).toHaveClass(/sidebar-collapsed/);
+    await page.getByRole("button", { name: "පැති තීරුව විවෘත කරන්න", exact: true }).click();
+  } else {
+    await page.getByRole("button", { name: "මෙනුව විවෘත කරන්න", exact: true }).click();
+    await expect(page.getByRole("navigation", { name: "ප්‍රධාන මෙනුව" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("navigation", { name: "ප්‍රධාන මෙනුව" })).not.toBeVisible();
+  }
 });

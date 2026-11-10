@@ -80,7 +80,7 @@ export function DocumentsLibrary() {
                 if (fileInput.current)
                     fileInput.current.value = "";
                 setFailure(errors.join("\n"));
-                setMessage(uploaded ? `${t("ගොනු", "Files")} ${uploaded} ${t("ක් එක් කෙරිණි", "added")}` : "");
+                setMessage(uploaded ? t(`ගොනු ${uploaded}ක් එක් කෙරිණි`, `${uploaded} files added`) : "");
                 if (!remaining.length)
                     setTitle("");
             }

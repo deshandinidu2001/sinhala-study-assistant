@@ -1,6 +1,6 @@
 # අකුර · Sinhala study assistant
 
-A shared Sinhala study workspace for your own notes and past papers. Upload a document, read its extracted text, ask for relevant passages with source links, and practise with scored questions. The original overview-only build has been replaced with working library, reader, question, and practice pages.
+A bilingual Sinhala/English study workspace for your own notes and past papers. Upload a document, read its extracted text, ask for relevant passages with source links, and practise with scored questions. The original overview-only build has been replaced with working library, reader, question, and practice pages.
 
 ## What works
 
@@ -11,7 +11,9 @@ A shared Sinhala study workspace for your own notes and past papers. Upload a do
 - Search the library by name/subject, filter by subject, read pages, and open original files.
 - Ask questions within a subject, one document, or the whole library. Relevant source passages include clickable document/page citations. Unmatched questions return a clear no-match message.
 - Create up to five multiple-choice fill-in-the-blank questions from actual source sentences. The server grades answers and returns explanations and source links after submission.
-- Ask in Sinhala, English, or Singlish (for example, `mkd jiwa pataka kiyanne`). Preview and edit the Sinhala interpretation before sending. Original and interpreted questions stay in history.
+- Switch the interface between English and Sinhala; the preference persists across tools and reloads. Source text stays in its original language.
+- Use a compact study desk, collapsible sidebar with live sources, and a chat composer that stays visible while the conversation scrolls. Select a source or subject in the chat source panel.
+- Ask in Sinhala, English, or Singlish (for example, `mkd jiwa pataka kiyanne` or `rudira patakaye karyan mnd`). Preview and edit the Sinhala interpretation before sending. Original and interpreted questions stay in history. Interpretation details expand on demand; source filters apply to history and retrieval.
 - Optionally enable server-side Gemini interpretation and Sinhala explanations with numbered source citations; missing keys and provider failures retain local passage answers.
 - Dictate an editable Sinhala question in browsers supporting `SpeechRecognition`/`webkitSpeechRecognition`. Dictation never sends the question automatically.
 - Responsive Sinhala interface, bundled Noto Sans Sinhala, keyboard focus, reduced-motion support, loading states, and actionable errors.
@@ -27,7 +29,7 @@ For TXT, Markdown, and Word files, citations refer to numbered text sections bec
 
 ## Answering mode and limits
 
-The app works **without API keys**. Without Gemini, answers quote relevant passages and Singlish uses an approximate offline phonetic converter with common spelling aliases. Choose Singlish explicitly for unrecognised spellings, or preview/edit the interpretation. Automatic detection is conservative so ordinary English queries remain unchanged. Singlish spellings are ambiguous; conversion is not guaranteed to be correct. A deterministic 1024-dimensional word/character hash index and a lexical relevance check are used locally. This is **not BGE-M3 semantic retrieval**. Queries work best with key terms from the document; synonyms and questions in a different language may not match.
+The app works **without API keys**. Without Gemini, answers quote relevant passages and Singlish uses spelling aliases and phonetic matching against vocabulary from the selected sources. For example, `rudira patakaye karyan mnd` becomes `රුධිර පටකයේ කාර්යයන් මොනවාද`. Retrieval recognizes common function-word synonyms such as කාර්ය / කෘත්‍ය and selects relevant sections within long OCR pages. Unknown terms can match Sinhala source words through their romanized spellings; ambiguous matches are left for phonetic fallback and the editable preview. Choose Singlish explicitly for unrecognised spellings, or preview/edit the interpretation. Automatic detection is conservative so ordinary English queries remain unchanged. Singlish spellings are ambiguous; conversion is not guaranteed to be correct. A deterministic 1024-dimensional word/character hash index and a lexical relevance check are used locally. This is **not BGE-M3 semantic retrieval**. Queries work best with key terms from the document; synonyms and questions in a different language may not match.
 
 Practice questions are source-based cloze exercises, not AI-generated exam papers. Very short notes may provide fewer than five questions or not enough material for a quiz. Only the `GEMINI_*` fields enable the optional Gemini provider. Other historical model-related environment fields remain reserved.
 
@@ -52,7 +54,7 @@ With a key configured, Singlish/Latin questions may be sent to Google for interp
 
 Gemini is prompted to use only the retrieved passages. Responses require valid numbered citations to supplied sources; failed, blocked, truncated, malformed, or invalid-citation responses fall back to verbatim passages with a notice. This validates citation references, not the factual correctness of every generated statement: check the linked original pages. No matching passages means no generated answer. Retrieval remains local and lexical, so paraphrases can still miss relevant sources. Practice quizzes remain source-based cloze exercises.
 
-Model and structured-output implementation references: [Google Gemini models](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash), [GenerateContent REST reference](https://ai.google.dev/api/generate-content), [structured output](https://ai.google.dev/gemini-api/docs/structured-output). You can change `GEMINI_MODEL` to another compatible text model available to your key. Real provider responses need a valid key and were not verified with live credentials in this change.
+Model and structured-output implementation references: [Google Gemini models](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash), [GenerateContent REST reference](https://ai.google.dev/api/generate-content), [structured output](https://ai.google.dev/gemini-api/docs/structured-output). You can change `GEMINI_MODEL` to another compatible text model available to your key. Gemini availability also depends on Google and model capacity. The configured key was accepted by the models endpoint during the interface update, while a generation request returned HTTP 503 (high demand). Local retrieval and Singlish interpretation remained available. This does not establish successful live generation.
 
 ## Architecture
 
