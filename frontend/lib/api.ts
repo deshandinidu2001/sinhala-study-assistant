@@ -20,7 +20,7 @@ export type QuizQuestion = { prompt: string; options: string[]; skill?: "knowled
 export type Quiz = { id: string; subject: string; grade?: number; kind?: string; language?: string; questions: QuizQuestion[] };
 export type QuizResult = { score: number; total: number; questions: (QuizQuestion & { answer_index: number; selected_index: number; correct: boolean; explanation: string; option_explanations?: string[]; evidence_quote?: string; source: Source })[] };
 export type SummaryPoint = { text: string; source: Source };
-export type DocumentSummary = { document_id: string; title: string; language: string; focus: string; mode: "gemini"; generated_at: string;
+export type DocumentSummary = { document_id: string; title: string; language: string; focus: string; mode: "gemini" | "kimi"; generated_at: string;
   sections: { heading: string; points: SummaryPoint[] }[]; key_terms: (SummaryPoint & { term: string })[]; revision_points: SummaryPoint[];
   coverage: { included_pages: number; total_pages: number; text_truncated: boolean };
 };

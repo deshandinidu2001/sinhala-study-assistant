@@ -162,3 +162,13 @@ input,textarea,select { color: var(--ink); border: 1px solid #d4dee5; border-rad
 .revision-points h3 { display: flex; align-items: center; gap: 9px; color: #46705e; }
 @media (max-width:1100px) { .summary-columns { grid-template-columns: 1fr; } .summary-terms dl { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; } .summary-terms dl > div { min-width: 0; } }
 @media (max-width:760px) { .summary-setup .scope-bar { grid-template-columns: 1fr; } .summary-title { flex-direction: column; gap: 10px; } .summary-title h2 { font-size: 20px; } .summary-section,.revision-points { padding: 22px 19px; } .summary-section li p,.revision-points li p { font-size: 13px; } .summary-terms dl { grid-template-columns: 1fr; gap: 0; } }
+
+.summary-content { border: 0; padding: 0; margin: 22px 0 12px; display: flex; flex-wrap: wrap; gap: 10px 20px; }
+.summary-content legend { font-size: 13px; margin-bottom: 12px; }
+.summary-content label { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.summary-content input { width: 17px; height: 17px; margin: 0; accent-color: #285e6b; }
+.summary-hint { font-size: 12px; color: #617a89; line-height: 1.9; }
+.summary-paragraphs > div + div { margin-top: 22px; }
+.summary-paragraphs p { font-size: 14px; line-height: 2; max-width: 77ch; white-space: pre-line; overflow-wrap: anywhere; }
+.summary-options { margin-top: 22px !important; }
+.summary-columns:not(:has(.summary-terms)) { grid-template-columns: 1fr; }

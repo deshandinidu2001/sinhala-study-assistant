@@ -1,7 +1,5 @@
 // UI copy only. Uploaded source text is never passed through this dictionary.
 export const messages: Record<string, string> = {
-  "සාරාංශය සෑදිය නොහැක. මඳ වේලාවකින් නැවත උත්සාහ කරන්න.": "Could not create the summary. Please try again shortly.",
-  "සාරාංශ සඳහා GEMINI_API_KEY එක් කර backend නැවත අරඹන්න.": "Add GEMINI_API_KEY and recreate the backend to generate summaries.",
   "ලේඛනයේ අකුරු ලබාගත නොහැක. ලේඛනය නැවත සකසන්න.": "The document text is unavailable. Reprocess the source.",
   "සාරාංශයකට ප්‍රමාණවත් අන්තර්ගතයක් නැත. දිගු ලේඛනයක් තෝරන්න.": "There is not enough material for a summary. Choose a longer source.",
   "ලේඛනය තවම සූදානම් නැත.": "This source is still processing.",
@@ -43,7 +41,6 @@ export const messages: Record<string, string> = {
   "ලේඛන සොයන්න": "Search sources",
   "ගොනු තෝරන්න": "Choose files",
   "සටහනේ අන්තර්ගතය": "Note text",
-  "උදා: ප්‍රභාසංස්ලේෂණය": "e.g. Photosynthesis",
   "උදා: විද්‍යාව": "e.g. Science",
   "විකල්පයි": "Optional",
   "විකල්පයි; ගොනු කිහිපයක් නම් ගොනු නම භාවිත වේ": "Optional",
@@ -103,6 +100,11 @@ export const messages: Record<string, string> = {
   "ප්‍රශ්න සෑදීමට ප්‍රමාණවත් සම්පූර්ණ වාක්‍ය නැත. වඩා දිගු පාඩම් සටහනක් එක් කරන්න.": "There is not enough text for practice. Add a longer note.",
   "ඇතුළත් කළ තොරතුරු පරීක්ෂා කරන්න. අවශ්‍ය අගයන් නිවැරදිව පුරවන්න.": "Check the required fields and try again.",
   "දත්ත ගබඩාවට සම්බන්ධ විය නොහැක. මඳ වේලාවකින් නැවත උත්සාහ කරන්න.": "The database is unavailable. Try again shortly.",
+  "සාරාංශය සෑදිය නොහැක. මඳ වේලාවකින් නැවත උත්සාහ කරන්න.": "Could not generate a verified summary. Try again, shorten the paragraphs or choose another provider.",
+  "සාරාංශයේ භාෂාව තහවුරු කළ නොහැක. නැවත උත්සාහ කරන්න.": "The summary was not in the requested language. Try again.",
+  "Kimi වෙත සම්බන්ධ විය නොහැක. Docker හි ආකෘතිය ධාවනය කරන්න හෝ Gemini තෝරන්න.": "Cannot use Kimi. Start the model in Docker or select Gemini.",
+  "සාරාංශ සඳහා GEMINI_API_KEY එක් කර backend නැවත අරඹන්න.": "Add GEMINI_API_KEY and recreate the backend to enable Gemini summaries.",
+
 };
 
 export function translate(text: string): string { return messages[text] ?? text; }
