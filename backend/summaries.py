@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
-from backend import gemini
+from backend import gemini, kimi
 from backend.db.models import Document
 from backend.evidence import compact, resolve_evidence
 from backend.study import StudyError, document_folder, normalize
@@ -18,6 +18,7 @@ SUMMARY_LANGUAGE = "සාරාංශයේ භාෂාව තහවුරු 
 
 
 class SummaryOptions(BaseModel):
+    provider: Literal["gemini", "kimi"] = "gemini"
     length: Literal["short", "medium", "long"] = "medium"
     include: list[Literal["definitions", "comparisons", "advantages", "disadvantages", "functions", "examples", "processes"]] = Field(default_factory=lambda: ["definitions", "comparisons", "advantages", "disadvantages", "functions", "examples", "processes"], min_length=1, max_length=7)
 
@@ -75,7 +76,7 @@ def summary_material(document: Document) -> tuple[list[dict], dict, str]:
 
 
 def summary_cache(document: Document, language: str, focus: str, fingerprint: str, options: SummaryOptions | None = None):
-    identity = json.dumps([language, focus.strip(), fingerprint, gemini.get_settings().gemini_summary_model, (options or SummaryOptions()).model_dump(), 2])
+    identity = json.dumps([language, focus.strip(), fingerprint, gemini.get_settings().gemini_summary_model, gemini.get_settings().kimi_model, gemini.get_settings().kimi_base_url, (options or SummaryOptions()).model_dump(), 2])
     name = "summary-" + hashlib.sha256(identity.encode()).hexdigest()[:24] + ".json"
     return document_folder(document.id) / name
 
@@ -97,7 +98,8 @@ def _make_summary(document: Document, language: str, focus: str = "", regenerate
             return json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             pass
-    if not gemini.configured():
+    options = options or SummaryOptions()
+    if options.provider == "gemini" and not gemini.configured():
         raise gemini.GeminiUnavailable(SUMMARY_NO_KEY)
     options = options or SummaryOptions()
     instruction = (
@@ -121,7 +123,8 @@ def _make_summary(document: Document, language: str, focus: str = "", regenerate
     data = {"document_title": document.title, "language": "Sinhala" if language == "si" else "English",
             "focus": focus, **options.model_dump(),
             "sources": [{"number": source["number"], "text": source["text"]} for source in sources]}
-    draft = gemini.generate(instruction, data, StudySummary,
+    generate = kimi.generate if options.provider == "kimi" else gemini.generate
+    draft = generate(instruction, data, StudySummary,
                             model=gemini.get_settings().gemini_summary_model, timeout=80, max_output_tokens=24000)
 
     def point_data(point: SummaryPoint) -> dict | None:
@@ -146,7 +149,7 @@ def _make_summary(document: Document, language: str, focus: str = "", regenerate
         raise StudyError(SUMMARY_LANGUAGE)
     result = {"document_id": str(document.id), "title": draft.title, "language": language, "focus": focus,
               "sections": sections, "key_terms": terms, "revision_points": revision, "coverage": coverage,
-              "generated_at": datetime.now(timezone.utc).isoformat(), "mode": "gemini", "options": options.model_dump()}
+              "generated_at": datetime.now(timezone.utc).isoformat(), "mode": options.provider, "options": options.model_dump()}
     temporary = path.with_suffix(f".{uuid4().hex}.tmp")
     temporary.write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8")
     temporary.replace(path)

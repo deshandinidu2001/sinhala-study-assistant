@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend import gemini
+from backend.kimi import KIMI_UNAVAILABLE
 from backend.summaries import make_summary, cached_summary, SUMMARY_NO_KEY, SUMMARY_UNAVAILABLE, SummaryOptions
 from backend.quizzes import make_mcq_quiz, NO_KEY, UNAVAILABLE
 from backend.pdf_pages import render_page
@@ -265,12 +266,12 @@ class SummaryInput(SummaryOptions):
 
 
 @router.get("/documents/{document_id}/summary")
-def get_summary(document_id: UUID, db: DB, language: Literal["si", "en"] = "si", focus: str = "", length: Literal["short", "medium", "long"] = "medium", include: str = "definitions,comparisons,advantages,disadvantages,functions,examples,processes") -> dict:
+def get_summary(document_id: UUID, db: DB, language: Literal["si", "en"] = "si", focus: str = "", length: Literal["short", "medium", "long"] = "medium", include: str = "definitions,comparisons,advantages,disadvantages,functions,examples,processes", provider: Literal["gemini", "kimi"] = "gemini") -> dict:
     document = require_document(db, document_id)
     if document.status != "ready":
         raise HTTPException(409, "ලේඛනය තවම සූදානම් නැත.")
     try:
-        result = cached_summary(document, language, focus[:500], SummaryOptions(length=length, include=include.split(",")))
+        result = cached_summary(document, language, focus[:500], SummaryOptions(length=length, include=include.split(","), provider=provider))
     except (StudyError, ValueError) as error:
         raise HTTPException(422, str(error))
     return {"summary": result}
@@ -282,11 +283,11 @@ def create_summary(document_id: UUID, body: SummaryInput, db: DB) -> dict:
     if document.status != "ready":
         raise HTTPException(409, "ලේඛනය තවම සූදානම් නැත.")
     try:
-        return make_summary(document, body.language, body.focus.strip(), body.regenerate, SummaryOptions(length=body.length, include=body.include))
+        return make_summary(document, body.language, body.focus.strip(), body.regenerate, SummaryOptions(length=body.length, include=body.include, provider=body.provider))
     except StudyError as error:
         raise HTTPException(422, str(error))
     except gemini.GeminiUnavailable as error:
-        raise HTTPException(503, SUMMARY_NO_KEY if str(error) == SUMMARY_NO_KEY else SUMMARY_UNAVAILABLE)
+        raise HTTPException(503, str(error) if str(error) in {SUMMARY_NO_KEY, KIMI_UNAVAILABLE} else SUMMARY_UNAVAILABLE)
 
 
 class QuizInput(BaseModel):

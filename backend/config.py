@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     chunk_overlap_tokens: int = Field(default=50, ge=0, lt=300)
     retrieval_top_k: int = Field(default=5, ge=1, le=20)
     retrieval_similarity_threshold: float = Field(default=0.45, ge=0, le=1)
+    kimi_base_url: str = "http://model-runner.docker.internal/engines/v1"
+    kimi_model: str = "hf.co/moonshotai/Kimi-K3"
+    kimi_timeout_seconds: float = Field(default=80, ge=5, le=90)
     gemini_api_key: SecretStr = SecretStr("")
     gemini_model: str = Field(default="gemini-3.8-flash", pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$")
     gemini_summary_model: str = Field(default="gemini-3.1-flash-lite", pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$")
