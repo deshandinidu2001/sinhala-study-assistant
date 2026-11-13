@@ -147,3 +147,21 @@ Select a source or subject, choose Sinhala or English under **Question language*
 Validation rejects missing-word stems, duplicate questions/options, invalid answer indices, invalid sources, ungrounded evidence, and a missing skill mix. A second Gemini call reviews question clarity, the answer key, source support, and distractor plausibility. A quote may be recovered from a substantial verbatim span when the model uses an original page number or an ellipsis; the displayed quote is always taken from the actual source text. These checks reduce poor output but do not guarantee factual correctness or official syllabus alignment. Verify important facts against the cited page.
 
 Generation and review have 30-second and 20-second provider timeouts. If a key, service, or quality check fails, the app asks you to retry or choose more material. It does not generate a lower-quality fallback. Quiz questions, answers and feedback are saved in PostgreSQL; no migration is needed. Existing saved quizzes are retained.
+
+## Paragraph summaries and optional Kimi
+
+Summaries now provide connected paragraphs under topic headings plus cited key points for revision. Choose short (about 30–50 words per paragraph), medium (50–80), or detailed (80–120). These are approximate targets, not strict word counts. Select definitions, comparisons, advantages, disadvantages, functions, examples, processes, or all topics. Only information supported by the uploaded source belongs in the summary; requested topics absent from the source are noted rather than invented. Long pages may be sampled, and the interface displays a coverage notice. AI summaries still need checking against the original.
+
+Sinhala output is checked for Sinhala script before saving. Generation and evidence/language failures get one retry. Both providers use the same source-evidence validation and cache, separated by document content, language, focus, length, selected topics and provider. Key terms are omitted when definitions are deselected.
+
+To use Kimi for summaries, enable Docker Model Runner in Docker Desktop and run:
+
+```powershell
+docker model run hf.co/moonshotai/Kimi-K3
+```
+
+Select **Kimi K3 · Docker** in Summary provider. The backend calls the OpenAI-compatible endpoint at `http://model-runner.docker.internal/engines/v1`; it never runs shell commands from the browser. For a host Python process, set `KIMI_BASE_URL=http://localhost:12434/engines/v1` and enable Model Runner TCP access. `KIMI_MODEL` defaults to the exact Hugging Face identifier above. Model Runner must have a compatible inference engine, the model and sufficient hardware. No Gemini key is needed for Kimi summaries. Chat and quizzes retain their existing Gemini behavior.
+
+Local verification on 2026-11-13: the requested Docker command reported a **1.56 TB** model download. The download was stopped; Kimi inference was not verified on this machine. The adapter is tested with controlled OpenAI-compatible responses, including malformed/truncated output. Selecting Kimi before it is available displays a message to start the model or choose Gemini. Gemini remains the default.
+
+References: [Kimi K3 model card and Docker command](https://huggingface.co/moonshotai/Kimi-K3), [Docker Model Runner API and container/host addresses](https://docs.docker.com/ai/model-runner/api-reference/).

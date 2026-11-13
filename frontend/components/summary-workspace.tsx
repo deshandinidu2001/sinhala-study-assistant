@@ -35,7 +35,7 @@ export function SummaryWorkspace() {
   useEffect(() => {
     const version = ++cacheVersion.current;
     setSummary(null); setError("");
-    if (!documentId) return;
+    if (!documentId || !include.length) return;
     const abort = new AbortController();
     const timer = setTimeout(() => {
       api<{ summary: DocumentSummary | null }>(`/documents/${documentId}/summary?language=${outputLanguage}&focus=${encodeURIComponent(focus.trim())}${optionQuery}`, { signal: abort.signal })
@@ -67,11 +67,11 @@ export function SummaryWorkspace() {
         <label>{t("සාරාංශ සේවාව", "Summary provider")}<select disabled={busy} value={provider} onChange={event => setProvider(event.target.value)}><option value="gemini">Gemini</option><option value="kimi">Kimi K3 · Docker</option></select></label>
       </div>
       <fieldset className="summary-content" disabled={busy}><legend>{t("ඇතුළත් කළ යුතු කරුණු", "Include in the summary")}</legend>
-        <label><input type="checkbox" checked={include.length === contentChoices.length} onChange={event => setInclude(event.target.checked ? contentChoices.map(([key]) => key) : ["definitions"])} />{t("සියල්ල", "All topics")}</label>
-        {contentChoices.map(([key, label]) => <label key={key}><input type="checkbox" checked={include.includes(key)} onChange={event => setInclude(current => event.target.checked ? [...current, key] : current.length > 1 ? current.filter(value => value !== key) : current)} />{label}</label>)}
+        <label><input type="checkbox" checked={include.length === contentChoices.length} onChange={event => setInclude(event.target.checked ? contentChoices.map(([key]) => key) : [])} />{t("සියල්ල", "All topics")}</label>
+        {contentChoices.map(([key, label]) => <label key={key}><input type="checkbox" checked={include.includes(key)} onChange={event => setInclude(current => event.target.checked ? [...current, key] : current.filter(value => value !== key))} />{label}</label>)}
       </fieldset>
       <p className="summary-hint">{t("වචන ගණන ආසන්න අගයකි. මුල් ලේඛනයේ ඇති තොරතුරු පමණක් ඇතුළත් වේ. නොමැති කරුණු සඳහන් කරයි.", "Word counts are approximate. Only source-supported information is included; missing topics are noted.")}</p>
-      <div className="form-actions"><p>{t("ප්‍රධාන කරුණු, වචන අර්ථ සහ මතක තබාගත යුතු දේ.", "Key concepts, definitions and revision points.")}</p><button className="primary-button" onClick={generate} disabled={busy || !documentId}><Icon name="summary" size={17} />{busy ? t("සකසමින්…") : summary ? t("නැවත සකසන්න", "Regenerate") : t("සාරාංශ කරන්න", "Summarize")}</button></div>
+      <div className="form-actions"><p>{t("ප්‍රධාන කරුණු, වචන අර්ථ සහ මතක තබාගත යුතු දේ.", "Key concepts, definitions and revision points.")}</p><button className="primary-button" onClick={generate} disabled={busy || !documentId || !include.length}><Icon name="summary" size={17} />{busy ? t("සකසමින්…") : summary ? t("නැවත සකසන්න", "Regenerate") : t("සාරාංශ කරන්න", "Summarize")}</button></div>
     </section>}
     {error && <p className="notice error" role="alert">{t(error)}</p>}
     {busy && <p className="thinking" role="status">{t("පාඩමේ වැදගත් කරුණු සකසමින්…", "Finding the key points in your document…")}</p>}

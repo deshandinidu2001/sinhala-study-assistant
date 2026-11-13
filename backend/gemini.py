@@ -33,12 +33,25 @@ def configured() -> bool:
     return bool(get_settings().gemini_api_key.get_secret_value().strip())
 
 
+def generation_schema(schema: type[BaseModel]) -> dict:
+    # Provider grammar compilation can reject deeply nested size constraints.
+    # Keep the JSON structure; Pydantic still enforces every bound on receipt.
+    def simplify(value):
+        if isinstance(value, dict):
+            return {key: simplify(item) for key, item in value.items()
+                    if key not in {"minLength", "maxLength", "minItems", "maxItems"}}
+        if isinstance(value, list):
+            return [simplify(item) for item in value]
+        return value
+    return simplify(schema.model_json_schema())
+
+
 def generate(instruction: str, data: dict, schema: type[BaseModel], *, model: str | None = None, timeout: float | None = None, max_output_tokens: int = 4096) -> BaseModel:
     settings = get_settings()
     payload = {
         "systemInstruction": {"parts": [{"text": instruction}]},
         "contents": [{"role": "user", "parts": [{"text": json.dumps(data, ensure_ascii=False)}]}],
-        "generationConfig": {"responseMimeType": "application/json", "responseJsonSchema": schema.model_json_schema(), "maxOutputTokens": max_output_tokens},
+        "generationConfig": {"responseMimeType": "application/json", "responseJsonSchema": generation_schema(schema), "maxOutputTokens": max_output_tokens},
     }
     try:
         with httpx.Client(timeout=timeout or settings.gemini_timeout_seconds, follow_redirects=False) as client:

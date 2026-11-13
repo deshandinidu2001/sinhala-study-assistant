@@ -130,3 +130,12 @@ OCR quality varies with the source; check recognised text against originals. Bro
 The trusted local shared-workspace scope remains. Authentication, multi-user isolation, Whisper transcription, retrieval benchmarking, and public production deployment are not claimed. Optional Gemini integration is described in the 2026-11-10 update above; live provider generation requires a key.
 
 Technical extraction references: [FastAPI file uploads](https://fastapi.tiangolo.com/tutorial/request-files/), [pypdf text extraction](https://pypdf.readthedocs.io/en/stable/user/extract-text.html), [Tesseract language data](https://github.com/tesseract-ocr/tessdoc/blob/main/Data-Files.md).
+
+### Summary verification — 2026-11-13
+
+- Rebuilt and started the production Docker API and frontend. `/health` reported both API and database healthy.
+- Full backend suite in Docker with disposable PostgreSQL databases: 92 passed. Frontend Vitest: 12 passed. Strict TypeScript and production Next.js build passed.
+- Desktop/mobile summary browser checks: 2 passed. These use controlled provider output and verify paragraph rendering, length/provider/content request values, revision points, citations, language switching and overflow.
+- Live Gemini requests against the existing 18-page living-tissues PDF returned HTTP 200 for short Sinhala, detailed Sinhala and English summaries. The short Sinhala output had six paragraphs; the detailed output had visibly longer paragraphs. All 18 pages were supplied without text truncation. Live desktop/mobile screenshots showed Sinhala paragraphs and linked sources with no browser exceptions or horizontal overflow. Approximate length targets are model instructions, not guaranteed counts.
+- During investigation the provider also returned HTTP 400/503 and a timeout. The provider grammar now omits nested size constraints while Pydantic enforces them locally; one retry handles transient errors and failed language/evidence validation. Provider availability is still external.
+- Kimi adapter responses are covered by controlled transport tests; local Kimi inference remains unverified because the requested download reported 1.56 TB and was stopped. No claim of successful local Kimi generation is made.

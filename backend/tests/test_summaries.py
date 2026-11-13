@@ -74,3 +74,45 @@ def test_summary_missing_key_and_unreadable_text_are_actionable(document, tmp_pa
     (tmp_path / "pages.json").write_text("[]", encoding="utf-8")
     with pytest.raises(StudyError):
         summary_material(document)
+
+def test_options_partition_cache_and_reach_prompt(document):
+    from backend.summaries import SummaryOptions
+    with patch.object(gemini, "configured", return_value=True), patch.object(gemini, "generate", side_effect=lambda *a, **kw: summary_draft()) as generate:
+        options = SummaryOptions(length="long", include=["comparisons"])
+        result = make_summary(document, "en", options=options)
+        assert result["options"]["length"] == "long"
+        assert result["key_terms"] == []
+        assert generate.call_args.args[1]["include"] == ["comparisons"]
+        assert "PARAGRAPHS" in generate.call_args.args[0]
+        assert "Selected paragraph length: long" in generate.call_args.args[0]
+        assert cached_summary(document, "en", "") is None
+        assert cached_summary(document, "en", "", options) == result
+
+
+def test_sinhala_language_failure_retries_without_caching_english(document):
+    with patch.object(gemini, "configured", return_value=True), patch.object(gemini, "generate", side_effect=lambda *a, **kw: summary_draft()) as generate:
+        with pytest.raises(StudyError, match="භාෂාව"):
+            make_summary(document, "si")
+        assert generate.call_count == 2
+        assert cached_summary(document, "si", "") is None
+
+
+def test_sinhala_retry_keeps_original_english_evidence(document):
+    good = summary_draft()
+    for section in good.sections:
+        section.heading = "ප්‍රභාසංස්ලේෂණ ක්‍රියාවලිය"
+        for point in section.points:
+            point.text = "හරිත ශාක හිරු එළියේ ශක්තිය භාවිතයෙන් ආහාර නිපදවයි. මෙම ක්‍රියාවලිය ප්‍රභාසංස්ලේෂණය ලෙස හැඳින්වේ."
+    with patch.object(gemini, "configured", return_value=True), patch.object(gemini, "generate", side_effect=[gemini.GeminiUnavailable(), good]) as generate:
+        result = make_summary(document, "si")
+        assert generate.call_count == 2
+        assert result["sections"][0]["points"][0]["source"]["page"] == 1
+
+
+def test_kimi_selection_does_not_require_gemini_key(document):
+    from backend import kimi
+    from backend.summaries import SummaryOptions
+    with patch.object(gemini, "configured", return_value=False), patch.object(kimi, "generate", return_value=summary_draft()) as generate:
+        result = make_summary(document, "en", options=SummaryOptions(provider="kimi"))
+        assert result["mode"] == "kimi"
+        assert generate.call_count == 1
