@@ -1,5 +1,11 @@
 // UI copy only. Uploaded source text is never passed through this dictionary.
 export const messages: Record<string, string> = {
+  "හඬ සමාලෝචනය සඳහා GEMINI_API_KEY එක් කර backend නැවත අරඹන්න.": "Add GEMINI_API_KEY to .env and recreate the backend to create audio reviews.",
+  "හඬ සමාලෝචනය සෑදිය නොහැක. Gemini සේවාව සහ TTS ප්‍රවේශය පරීක්ෂා කර නැවත උත්සාහ කරන්න.": "Audio generation is unavailable. Check Gemini service availability and TTS access, then retry.",
+  "හඬ සමාලෝචනයට මෙම සාරාංශය දිග වැඩියි. කෙටි සාරාංශයක් හෝ විශේෂ මාතෘකාවක් තෝරන්න.": "This summary is too long for audio. Choose a short summary or a narrower topic.",
+  "පළමුව සාරාංශයක් සකසන්න. ඉන්පසු හඬ සමාලෝචනය සාදන්න.": "Prepare a summary first, then create its audio review.",
+  "හඬ ගොනුව සුරැකිය නොහැක. නැවත උත්සාහ කරන්න.": "Could not save the audio recording. Please retry.",
+  "හඬ ගොනුව හමු නොවීය. හඬ සමාලෝචනය නැවත සාදන්න.": "The recording was not found. Create the audio review again.",
   "ලේඛනයේ අකුරු ලබාගත නොහැක. ලේඛනය නැවත සකසන්න.": "The document text is unavailable. Reprocess the source.",
   "සාරාංශයකට ප්‍රමාණවත් අන්තර්ගතයක් නැත. දිගු ලේඛනයක් තෝරන්න.": "There is not enough material for a summary. Choose a longer source.",
   "ලේඛනය තවම සූදානම් නැත.": "This source is still processing.",

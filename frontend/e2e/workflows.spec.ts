@@ -375,7 +375,7 @@ test("quiz generation failure stays actionable and never shows missing-word fall
 test("new answers reveal gradually and can be shown immediately", async ({ page }) => {
   const text = "Plants absorb light through chlorophyll. Light provides energy for photosynthesis and food production in green leaves. ".repeat(14);
   let counter = 0;
-  await page.route("**/chat", route => route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: `animated-${counter++}`, question: "test question", normalized_question: "test question", answer: text, sources: [], mode: "extractive", created_at: new Date().toISOString() }) }));
+  await page.route("http://localhost:8000/chat", route => route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: `animated-${counter++}`, question: "test question", normalized_question: "test question", answer: text, sources: [], mode: "extractive", created_at: new Date().toISOString() }) }));
   await page.goto("/chat");
   const question = page.getByRole("textbox", { name: "ඔබේ ප්‍රශ්නය", exact: true });
   await expect(question).toBeEnabled();

@@ -9,6 +9,7 @@ const items: { href: string; label: string; english: string; icon: IconName }[] 
   { href: "/documents", label: "මගේ ලේඛන", english: "Sources", icon: "book" },
   { href: "/chat", label: "සංවාදය", english: "Ask your notes", icon: "chat" },
   { href: "/summaries", label: "සාරාංශ", english: "Summaries", icon: "summary" },
+  { href: "/audio-review", label: "හඬ සමාලෝචනය", english: "Audio Review", icon: "headphones" },
   { href: "/practice", label: "පුහුණුව", english: "Practice", icon: "quiz" },
 ];
 export function WorkspaceNav() {

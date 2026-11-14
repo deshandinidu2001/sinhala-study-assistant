@@ -148,6 +148,18 @@ Validation rejects missing-word stems, duplicate questions/options, invalid answ
 
 Generation and review have 30-second and 20-second provider timeouts. If a key, service, or quality check fails, the app asks you to retry or choose more material. It does not generate a lower-quality fallback. Quiz questions, answers and feedback are saved in PostgreSQL; no migration is needed. Existing saved quizzes are retained.
 
+## Audio Review
+
+Open **Audio Review** in the sidebar, or choose it on a source card or in the reader. Select a ready source, Sinhala or English, and the topics to cover. Choose **Prepare review script**, check its cited summary, then **Create audio review**. Existing summaries also offer the audio player.
+
+The player supports play/pause, seeking, playback speeds from 0.75× to 2×, a narration transcript, and WAV downloads. Recordings are saved beside the document under `storage/` and restored when the same summary settings are selected. Replaying or downloading a saved recording does not call Gemini again. Deleting the document deletes its saved recordings. Back up storage together with the database.
+
+Audio generation uses the existing server-side `GEMINI_API_KEY` and `GEMINI_TTS_MODEL` (default `gemini-3.8-flash-lite-tts`). The key needs access to this speech model; provider quotas, billing and availability apply. No key is exposed to the browser. The validated summary text is sent to Google for narration, including when Kimi prepared the summary. Nothing is sent for speech until **Create audio review** is pressed. The speech request sets `store: false`; Google's provider data policies still apply.
+
+This is a single AI narrator reading the summary, not an interactive conversation. Text is limited to 10,000 characters per review; choose a short summary or narrower focus for longer chapters. The interface reports missing keys, unavailable speech generation, oversized scripts, and playback failures. Check pronunciation and facts against the displayed script and source citations, especially for Sinhala scientific vocabulary. Downloads are WAV files, not MP3. This remains a trusted local workspace without user isolation.
+
+Implementation reference: [Google Gemini speech generation](https://ai.google.dev/gemini-api/docs/speech-generation). Local live QA on 2026-11-14 produced a real Sinhala WAV from the configured speech model; automated tests separately check caching, malformed output, partial downloads, and browser playback.
+
 ## Paragraph summaries and optional Kimi
 
 Summaries now provide connected paragraphs under topic headings plus cited key points for revision. Choose short (about 30–50 words per paragraph), medium (50–80), or detailed (80–120). These are approximate targets, not strict word counts. Select definitions, comparisons, advantages, disadvantages, functions, examples, processes, or all topics. Only information supported by the uploaded source belongs in the summary; requested topics absent from the source are noted rather than invented. Long pages may be sampled, and the interface displays a coverage notice. AI summaries still need checking against the original.

@@ -172,3 +172,18 @@ input,textarea,select { color: var(--ink); border: 1px solid #d4dee5; border-rad
 .summary-paragraphs p { font-size: 14px; line-height: 2; max-width: 77ch; white-space: pre-line; overflow-wrap: anywhere; }
 .summary-options { margin-top: 22px !important; }
 .summary-columns:not(:has(.summary-terms)) { grid-template-columns: 1fr; }
+.audio-review { margin: 0 0 24px; padding: 24px 28px; background: #eff6f5; border-color: #d4e5e2; }
+.audio-review-heading { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.audio-review-icon { display: grid; place-items: center; flex-shrink: 0; width: 48px; height: 48px; border-radius: 50%; color: #285e6b; background: #dbecea; }
+.audio-review-heading h3 { font-size: 17px; line-height: 1.8; }
+.audio-review-heading p { color: #617a89; font-size: 12px; }
+.audio-language { margin-left: auto; font-size: 11px; padding: 4px 10px; border: 1px solid #d4e5e2; border-radius: 20px; flex-shrink: 0; }
+.audio-review .summary-hint { margin-bottom: 18px; }
+.audio-review audio { display: block; width: 100%; margin: 18px 0; }
+.audio-review-controls { display: flex; align-items: end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.audio-review-controls label { font-size: 12px; width: 145px; }
+.audio-review-controls select { margin-top: 6px; background: #fff; }
+.audio-transcript { border-top: 1px solid #d4e5e2; margin-top: 20px; padding-top: 16px; }
+.audio-transcript summary { font-size: 13px; cursor: pointer; }
+.audio-transcript p { margin-top: 16px; white-space: pre-line; line-height: 2; font-size: 14px; overflow-wrap: anywhere; }
+@media (max-width:760px) { .audio-review { padding: 20px 18px; } .audio-language { display: none; } .audio-review-controls { align-items: stretch; flex-direction: column; } .audio-review-controls label { width: 100%; } }

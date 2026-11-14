@@ -7,15 +7,16 @@ import { useLanguage } from "@/lib/language";
 import { useDocuments } from "@/lib/use-documents";
 import { Icon } from "@/components/icon";
 import { SourceLink } from "@/components/source-link";
+import { AudioReviewPlayer } from "@/components/audio-review-player";
 
-export function SummaryWorkspace() {
+export function SummaryWorkspace({ audioReview = false }: { audioReview?: boolean }) {
   const params = useSearchParams();
   const { language, t } = useLanguage();
   const { documents, loading, error: documentsError } = useDocuments();
   const cacheVersion = useRef(0);
   const [selected, setSelected] = useState(params.get("document") ?? "");
   const [outputLanguage, setOutputLanguage] = useState<"si" | "en">(language);
-  const [length, setLength] = useState("medium");
+  const [length, setLength] = useState(audioReview ? "short" : "medium");
   const [provider, setProvider] = useState("gemini");
   const contentChoices = [
     ["definitions", t("අර්ථ දැක්වීම්", "Definitions")], ["comparisons", t("සැසඳීම් හා වෙනස්කම්", "Comparisons")],
@@ -55,7 +56,7 @@ export function SummaryWorkspace() {
     finally { setBusy(false); }
   }
   return <div className="overview tool-page summary-page">
-    <div className="page-intro"><h1>{t("සාරාංශ", "Summaries")}</h1><p>{t("වැදගත් කරුණු, සරලව.", "The points worth keeping.")}</p></div>
+    <div className="page-intro"><h1>{audioReview ? t("හඬ සමාලෝචනය", "Audio Review") : t("සාරාංශ", "Summaries")}</h1><p>{audioReview ? t("සාරාංශයක් සකසා, අසා නැවත පාඩම් කරන්න.", "Prepare a review script, then listen to your notes.") : t("වැදගත් කරුණු, සරලව.", "The points worth keeping.")}</p></div>
     {documentsError && <p className="notice error" role="alert">{t(documentsError)}</p>}
     {!loading && !ready.length ? <div className="empty-state tool-card"><Icon name="summary" size={34} /><h2>{t("සාරාංශයක් සඳහා ලේඛනයක් එක් කරන්න", "Add a source to summarize")}</h2><Link className="primary-button" href="/documents#upload">{t("ලේඛනයක් එක් කරන්න")}</Link></div> : <section className="tool-card summary-setup" aria-label={t("සාරාංශය සකසන්න", "Summary settings")}>
       <div className="scope-bar"><label>{t("ලේඛනය")}<select value={documentId} disabled={busy} onChange={event => setSelected(event.target.value)}>{ready.map(document => <option value={document.id} key={document.id}>{document.title}</option>)}</select></label><label>{t("සාරාංශ භාෂාව", "Summary language")}<select value={outputLanguage} disabled={busy} onChange={event => setOutputLanguage(event.target.value as "si" | "en")}><option value="si">සිංහල</option><option value="en">English</option></select></label></div>
@@ -71,12 +72,13 @@ export function SummaryWorkspace() {
         {contentChoices.map(([key, label]) => <label key={key}><input type="checkbox" checked={include.includes(key)} onChange={event => setInclude(current => event.target.checked ? [...current, key] : current.filter(value => value !== key))} />{label}</label>)}
       </fieldset>
       <p className="summary-hint">{t("වචන ගණන ආසන්න අගයකි. මුල් ලේඛනයේ ඇති තොරතුරු පමණක් ඇතුළත් වේ. නොමැති කරුණු සඳහන් කරයි.", "Word counts are approximate. Only source-supported information is included; missing topics are noted.")}</p>
-      <div className="form-actions"><p>{t("ප්‍රධාන කරුණු, වචන අර්ථ සහ මතක තබාගත යුතු දේ.", "Key concepts, definitions and revision points.")}</p><button className="primary-button" onClick={generate} disabled={busy || !documentId || !include.length}><Icon name="summary" size={17} />{busy ? t("සකසමින්…") : summary ? t("නැවත සකසන්න", "Regenerate") : t("සාරාංශ කරන්න", "Summarize")}</button></div>
+      <div className="form-actions"><p>{t("ප්‍රධාන කරුණු, වචන අර්ථ සහ මතක තබාගත යුතු දේ.", "Key concepts, definitions and revision points.")}</p><button className="primary-button" onClick={generate} disabled={busy || !documentId || !include.length}><Icon name="summary" size={17} />{busy ? t("සකසමින්…") : summary ? t("නැවත සකසන්න", "Regenerate") : audioReview ? t("කියවන සාරාංශය සකසන්න", "Prepare review script") : t("සාරාංශ කරන්න", "Summarize")}</button></div>
     </section>}
     {error && <p className="notice error" role="alert">{t(error)}</p>}
     {busy && <p className="thinking" role="status">{t("පාඩමේ වැදගත් කරුණු සකසමින්…", "Finding the key points in your document…")}</p>}
     {summary && <section className="summary-result" aria-label={t("පාඩම් සාරාංශය", "Study summary")}>
       <div className="summary-title"><h2>{summary.title}</h2><Link className="text-button" href={`/documents/${documentId}`}>{t("මුල් ලේඛනය", "Read original")}<Icon name="source" size={15} /></Link></div>
+      <AudioReviewPlayer key={`${documentId}|${outputLanguage}|${optionQuery}|${focus.trim()}|${summary.generated_at}`} documentId={documentId} options={{ language: outputLanguage, focus: focus.trim(), length, include, provider }} />
       {summary.coverage.text_truncated && <p className="notice">{t("දිගු පිටුවල තෝරාගත් අකුරු කොටස් ඇසුරින් මෙම සාරාංශය සකසා ඇත.", "This summary uses selected text from long pages. Check the original for full detail.")}</p>}
       <div className="summary-columns"><div className="summary-sections">{summary.sections.map((section, index) => <article className="summary-section" key={index}><h3>{section.heading}</h3><div className="summary-paragraphs">{section.points.map((point, pointIndex) => <div key={pointIndex}><p>{point.text}</p><SourceLink source={point.source} /></div>)}</div></article>)}
       <article className="revision-points"><h3><Icon name="check" size={19} />{t("මතක තබාගන්න", "For revision")}</h3><ul>{summary.revision_points.map((point, index) => <li key={index}><p>{point.text}</p><SourceLink source={point.source} /></li>)}</ul></article></div>

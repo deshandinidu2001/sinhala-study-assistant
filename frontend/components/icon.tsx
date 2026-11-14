@@ -1,9 +1,10 @@
 import type { CSSProperties } from "react";
 
-export type IconName = "book" | "home" | "document" | "chat" | "quiz" | "arrow" | "check" | "source" | "leaf" | "menu" | "close" | "plus" | "panel" | "search" | "mic" | "settings" | "summary";
+export type IconName = "book" | "home" | "document" | "chat" | "quiz" | "arrow" | "check" | "source" | "leaf" | "menu" | "close" | "plus" | "panel" | "search" | "mic" | "settings" | "summary" | "headphones";
 
 const paths: Record<IconName, React.ReactNode> = {
   summary: <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 7h8M8 11h8M8 15h5M8 18h3" /></>,
+  headphones: <><path d="M4 14v-3a8 8 0 0 1 16 0v3" /><rect x="3" y="12" width="5" height="9" rx="2" /><rect x="16" y="12" width="5" height="9" rx="2" /></>,
   menu: <path d="M4 6h16M4 12h16M4 18h16" />,
   close: <path d="m6 6 12 12M6 18 18 6" />,
   plus: <path d="M12 5v14M5 12h14" />,
