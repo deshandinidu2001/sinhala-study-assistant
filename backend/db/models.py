@@ -14,6 +14,16 @@ class Base(DeclarativeBase):
     pass
 
 
+DEFAULT_WORKSPACE = UUID("00000000-0000-0000-0000-000000000001")
+
+class Workspace(Base):
+    __tablename__ = "workspaces"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(120))
+    description: Mapped[str] = mapped_column(String(500), server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
 class Document(Base):
     __tablename__ = "documents"
     __table_args__ = (
@@ -25,6 +35,7 @@ class Document(Base):
         Index("ix_documents_subject", "subject"),
     )
 
+    workspace_id: Mapped[UUID] = mapped_column(ForeignKey("workspaces.id", ondelete="RESTRICT"), index=True, default=DEFAULT_WORKSPACE, server_default=text("'00000000-0000-0000-0000-000000000001'::uuid"))
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     title: Mapped[str] = mapped_column(String(255))
     subject: Mapped[str] = mapped_column(String(120))
@@ -68,6 +79,7 @@ class Chunk(Base):
 class Chat(Base):
     __tablename__ = "chats"
 
+    workspace_id: Mapped[UUID] = mapped_column(ForeignKey("workspaces.id", ondelete="RESTRICT"), index=True, default=DEFAULT_WORKSPACE, server_default=text("'00000000-0000-0000-0000-000000000001'::uuid"))
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     details: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     question: Mapped[str] = mapped_column(Text)
@@ -78,8 +90,10 @@ class Chat(Base):
 
 
 class Quiz(Base):
+    result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     __tablename__ = "quizzes"
 
+    workspace_id: Mapped[UUID] = mapped_column(ForeignKey("workspaces.id", ondelete="RESTRICT"), index=True, default=DEFAULT_WORKSPACE, server_default=text("'00000000-0000-0000-0000-000000000001'::uuid"))
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     subject: Mapped[str] = mapped_column(String(120))
     questions: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
