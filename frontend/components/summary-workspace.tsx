@@ -38,12 +38,17 @@ export function SummaryWorkspace({ audioReview = false }: { audioReview?: boolea
     setSummary(null); setError("");
     if (!documentId || !include.length) return;
     const abort = new AbortController();
+    const saved = params.get("summary");
+    if (saved) {
+      api<DocumentSummary & { options?: { length: string; include: string[]; provider: string } }>(`/documents/${documentId}/saved-summary/${saved}`, { signal: abort.signal }).then(value => { if (cacheVersion.current === version) setSummary(value); }).catch(e => { if (!abort.signal.aborted) setError(e.message); });
+      return () => abort.abort();
+    }
     const timer = setTimeout(() => {
       api<{ summary: DocumentSummary | null }>(`/documents/${documentId}/summary?language=${outputLanguage}&focus=${encodeURIComponent(focus.trim())}${optionQuery}`, { signal: abort.signal })
         .then(result => { if (cacheVersion.current === version) setSummary(result.summary); }).catch(failure => { if (!abort.signal.aborted) setError(failure.message); });
     }, 250);
     return () => { clearTimeout(timer); abort.abort(); };
-  }, [documentId, outputLanguage, focus, optionQuery]);
+  }, [documentId, outputLanguage, focus, optionQuery, params]);
   async function generate() {
     if (!documentId || busy) return;
     const version = ++cacheVersion.current;

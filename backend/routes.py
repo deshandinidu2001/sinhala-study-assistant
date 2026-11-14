@@ -387,4 +387,42 @@ def grade_quiz(quiz_id: UUID, body: QuizSubmission, db: DB) -> dict:
     if len(body.answers) != len(quiz.questions) or any(a < 0 or a >= len(q["options"]) for a, q in zip(body.answers, quiz.questions)):
         raise HTTPException(422, "සෑම ප්‍රශ්නයකටම වලංගු පිළිතුරක් තෝරන්න.")
     results = [{**q, "selected_index": a, "correct": a == q["answer_index"]} for a, q in zip(body.answers, quiz.questions)]
-    return {"score": sum(q["correct"] for q in results), "total": len(results), "questions": results}
+    result = {"score": sum(q["correct"] for q in results), "total": len(results), "questions": results}
+    quiz.result = result
+    db.commit()
+    return result
+
+
+@router.get("/quizzes/{quiz_id}")
+def get_quiz(quiz_id: UUID, db: DB) -> dict:
+    quiz = db.get(Quiz, quiz_id)
+    if quiz is None:
+        raise HTTPException(404, "Quiz not found")
+    return {**quiz_data(quiz), "result": quiz.result}
+
+
+@router.get("/studio")
+def studio_outputs(db: DB) -> list[dict]:
+    outputs = []
+    for quiz in db.scalars(select(Quiz).order_by(Quiz.created_at.desc())):
+        outputs.append({"id": str(quiz.id), "type": "quiz", "title": quiz.subject,
+            "language": quiz.questions[0].get("language", "si") if quiz.questions else "si",
+            "created_at": quiz.created_at.isoformat(), "document_id": None})
+    for document in db.scalars(select(Document)):
+        for path in document_folder(document.id).glob("summary-*.json"):
+            try:
+                value = json.loads(path.read_text(encoding="utf-8"))
+                outputs.append({"id": path.stem, "type": "summary", "title": value["title"],
+                    "language": value["language"], "created_at": value["generated_at"], "document_id": str(document.id)})
+            except (OSError, ValueError, KeyError):
+                continue
+    return sorted(outputs, key=lambda item: item["created_at"], reverse=True)
+
+
+@router.get("/documents/{document_id}/saved-summary/{identity}")
+def saved_summary(document_id: UUID, identity: Annotated[str, ApiPath(pattern=r"^summary-[a-f0-9]{24}$")], db: DB) -> dict:
+    require_document(db, document_id)
+    try:
+        return json.loads((document_folder(document_id) / f"{identity}.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raise HTTPException(404, "Saved summary not found")

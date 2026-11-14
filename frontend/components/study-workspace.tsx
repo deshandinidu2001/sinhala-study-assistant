@@ -8,6 +8,8 @@ import { WorkspaceForm, type Workspace } from "@/components/workspace-home";
 import { WorkspaceSources } from "@/components/workspace-sources";
 import { DocumentsLibrary } from "@/components/documents-library";
 import { DocumentReader } from "@/components/document-reader";
+import { SummaryWorkspace } from "@/components/summary-workspace";
+import { PracticeWorkspace } from "@/components/practice-workspace";
 import { ChatWorkspace } from "@/components/chat-workspace";
 import { Icon } from "@/components/icon";
 
@@ -29,7 +31,7 @@ function WorkspaceContent({ id }: { id: string }) {
     <div className="study-heading"><Link href="/">{t("සියලු අවකාශ", "All workspaces")}</Link><h1>{workspace.name}</h1><button className="text-button" onClick={() => setEditing(!editing)}>{t("නම වෙනස් කරන්න", "Rename")}</button><div className="panel-toggles"><button className="secondary-button" aria-pressed={sourcesOpen} onClick={() => setSourcesOpen(!sourcesOpen)}>{t("මූලාශ්‍ර", "Sources")}</button><button className="secondary-button" aria-pressed={studioOpen} onClick={() => setStudioOpen(!studioOpen)}>Studio</button></div></div>
     {editing && <WorkspaceForm initial={workspace} onCancel={() => setEditing(false)} onSaved={w => { setWorkspace(w); setEditing(false); }}/ >}
     <nav className="workspace-mobile-tabs" aria-label={t("අවකාශයේ කොටස්", "Workspace panels")}>{[["sources",t("මූලාශ්‍ර","Sources")],["chat",t("සංවාදය","Chat")],["studio","Studio"]].map(([value,label]) => <button key={value} aria-pressed={tab === value} onClick={() => setTab(value)}>{label}</button>)}</nav>
-    {tool && <section className="workspace-tool-view"><Link className="secondary-button" href={`/workspaces/${id}`}>{t("සංවාදයට ආපසු", "Back to chat")}</Link>{tool === "documents" && <DocumentsLibrary/>}{tool === "reader" && params.get("document") && <DocumentReader id={params.get("document")!}/>}</section>}
+    {tool && <section className="workspace-tool-view"><Link className="secondary-button" href={`/workspaces/${id}`}>{t("සංවාදයට ආපසු", "Back to chat")}</Link>{tool === "summaries" && <SummaryWorkspace/>}{tool === "practice" && <PracticeWorkspace/>}{tool === "documents" && <DocumentsLibrary/>}{tool === "reader" && params.get("document") && <DocumentReader id={params.get("document")!}/>}</section>}
     <div className="study-columns" hidden={!!tool}>
       <aside className="workspace-sources"><WorkspaceSources id={id} selected={selected} onSelect={setSelected}/></aside>
       <section className="workspace-conversation" aria-label={t("සංවාදය", "Chat")}><ChatWorkspace key={id} selectedSources={selected}/></section>

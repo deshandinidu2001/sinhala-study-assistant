@@ -20,6 +20,12 @@ export function PracticeWorkspace() {
     const [result, setResult] = useState<QuizResult | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
+    useEffect(() => {
+      const saved = params.get("quiz"); if (!saved) return;
+      const controller = new AbortController();
+      api<Quiz & { result: QuizResult | null }>(`/quizzes/${saved}`, { signal: controller.signal }).then(value => { setQuiz(value); setAnswers(value.questions.map(() => -1)); setResult(value.result); }).catch(e => { if (!controller.signal.aborted) setError(e.message); });
+      return () => controller.abort();
+    }, [params]);
     const ready = documents.filter(d => d.status === "ready");
     const subjects = [...new Set(ready.map(d => d.subject))].sort();
     const validSelected = ready.some(d => d.id === selected) ? selected : "";
