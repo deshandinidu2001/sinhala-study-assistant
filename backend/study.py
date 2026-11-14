@@ -253,8 +253,10 @@ def source_excerpt(question: str, text: str) -> str:
     return max(windows, key=score)
 
 
-def retrieve(db: Session, question: str, subject: str | None = None, document_id: UUID | None = None) -> list[dict]:
+def retrieve(db: Session, question: str, subject: str | None = None, document_id: UUID | None = None, document_ids: list[UUID] | None = None) -> list[dict]:
     query = select(Chunk, Document).join(Document).where(Document.status == "ready")
+    if document_ids is not None:
+        query = query.where(Document.id.in_(document_ids))
     if subject:
         query = query.where(Document.subject == subject)
     if document_id:

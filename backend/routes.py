@@ -19,7 +19,7 @@ from backend.summaries import make_summary, cached_summary, SUMMARY_NO_KEY, SUMM
 from backend.quizzes import make_mcq_quiz, NO_KEY, UNAVAILABLE
 from backend.pdf_pages import render_page
 from backend.config import get_settings
-from backend.db.models import Chat, Chunk, Document, Quiz
+from backend.db.models import Chat, Chunk, Document, Quiz, DEFAULT_WORKSPACE, Workspace
 from backend.db.session import get_db
 from backend.study import EXTENSIONS, StudyError, document_folder, ingest, normalize, retrieve, source_path, words
 
@@ -29,7 +29,7 @@ DB = Annotated[Session, Depends(get_db)]
 
 def document_data(document: Document) -> dict:
     return {"id": str(document.id), "title": document.title, "subject": document.subject,
-            "filename": document.filename, "page_count": document.page_count,
+            "workspace_id": str(document.workspace_id), "filename": document.filename, "page_count": document.page_count,
             "status": document.status, "file_size": document.file_size, "error": document.error,
             "extraction_method": document.extraction_method, "uploaded_at": document.uploaded_at.isoformat()}
 
@@ -60,7 +60,7 @@ def save_document(db: Session, request: Request, filename: str, content: bytes, 
     subject = normalize(subject) or "සාමාන්‍ය"
     if len(title) > 255 or len(subject) > 120:
         raise HTTPException(422, "ලේඛන නම අකුරු 255 සහ විෂය අකුරු 120 නොඉක්මවිය යුතුය.")
-    document = Document(id=uuid4(), title=title, subject=subject, filename=filename, file_size=len(content), status="pending")
+    document = Document(workspace_id=db.info.get("workspace_id", DEFAULT_WORKSPACE), id=uuid4(), title=title, subject=subject, filename=filename, file_size=len(content), status="pending")
     folder = document_folder(document.id)
     folder.mkdir(parents=True, exist_ok=False)
     try:
@@ -180,6 +180,7 @@ class QuestionInput(BaseModel):
     question: str = Field(min_length=2, max_length=2000)
     subject: str | None = Field(default=None, max_length=120)
     document_id: UUID | None = None
+    document_ids: list[UUID] | None = Field(default=None, max_length=200)
 
     @field_validator("question")
     @classmethod
@@ -201,11 +202,20 @@ def chat_data(chat: Chat) -> dict:
 
 
 def question_vocabulary(db: Session, body: QuestionInput) -> set[str]:
+    if body.document_ids is not None:
+        if not body.document_ids:
+            raise HTTPException(422, "Select at least one ready source")
+        for identity in body.document_ids:
+            item = require_document(db, identity)
+            if item.status != "ready":
+                raise HTTPException(409, "Source is not ready")
     query = select(Chunk.text).join(Document).where(Document.status == "ready")
     if body.document_id:
         query = query.where(Document.id == body.document_id)
     if body.subject:
         query = query.where(Document.subject == body.subject)
+    if body.document_ids is not None:
+        query = query.where(Document.id.in_(body.document_ids))
     vocabulary = set()
     for content in db.scalars(query.order_by(Chunk.document_id, Chunk.page, Chunk.chunk_index).limit(500)):
         vocabulary.update(words(content))
@@ -236,7 +246,7 @@ def ask_question(body: QuestionInput, db: DB) -> dict:
     if body.document_id:
         require_document(db, body.document_id)
     question, normalization, notice = gemini.interpret(body.question, body.language, question_vocabulary(db, body))
-    sources = retrieve(db, question, body.subject, body.document_id)
+    sources = retrieve(db, question, body.subject, body.document_id, body.document_ids)
     if sources:
         answer = ("Relevant passages from your sources:\n\n" if body.answer_language == "en" else "ඔබේ ලේඛනවලින් හමු වූ අදාළ කොටස්:\n\n") + "\n\n".join(f"{source['excerpt']} [{i}]" for i, source in enumerate(sources, 1))
     else:
@@ -253,7 +263,7 @@ def ask_question(body: QuestionInput, db: DB) -> dict:
                 notice = "Gemini පිළිතුර මූලාශ්‍රවලින් තහවුරු කළ නොහැකි නිසා අදාළ කොටස් උපුටා පෙන්වයි."
         except gemini.GeminiUnavailable:
             notice = gemini.FALLBACK_NOTICE
-    chat = Chat(question=body.question, answer=answer, sources=sources, subject=body.subject, details={"document_id": str(body.document_id) if body.document_id else None, "normalized_question": question, "normalization": normalization, "mode": mode, "notice": notice})
+    chat = Chat(workspace_id=db.info.get("workspace_id", DEFAULT_WORKSPACE), question=body.question, answer=answer, sources=sources, subject=body.subject, details={"document_id": str(body.document_id) if body.document_id else None, "normalized_question": question, "normalization": normalization, "mode": mode, "notice": notice})
     db.add(chat)
     db.commit()
     db.refresh(chat)
@@ -358,7 +368,7 @@ def create_quiz(body: QuizInput, db: DB) -> dict:
         raise HTTPException(422, str(error))
     except gemini.GeminiUnavailable as error:
         raise HTTPException(503, NO_KEY if str(error) == NO_KEY else UNAVAILABLE)
-    quiz = Quiz(subject=body.subject or "සියලු විෂයන්", questions=questions)
+    quiz = Quiz(workspace_id=db.info.get("workspace_id", DEFAULT_WORKSPACE), subject=body.subject or "සියලු විෂයන්", questions=questions)
     db.add(quiz)
     db.commit()
     db.refresh(quiz)
