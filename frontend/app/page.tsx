@@ -1,5 +1,5 @@
-import { StudyOverview } from "@/components/study-overview";
+import { WorkspaceHome } from "@/components/workspace-home";
 
 export default function Home() {
-  return <StudyOverview />;
+  return <WorkspaceHome />;
 }
