@@ -28,6 +28,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   function toggleSidebar() {
     setCollapsed(value => { try { localStorage.setItem("akura-sidebar", value ? "expanded" : "collapsed"); } catch {} return !value; });
   }
+  if (pathname === "/" || pathname.startsWith("/workspaces/")) return <div className="notebook-app"><a className="skip-link" href="#main">{t("ප්‍රධාන අන්තර්ගතයට යන්න", "Skip to content")}</a><header className="notebook-topbar"><Link className="brand" href="/"><span className="brand-symbol">අ</span><strong>{t("අකුර", "Akura")}.</strong></Link><div className="notebook-status"><ConnectionStatus/><select aria-label="Interface language" value={language} onChange={e => setLanguage(e.target.value as "si" | "en")}><option value="si">සිංහල</option><option value="en">English</option></select></div></header><main id="main" key={pathname}>{children}</main></div>;
   return <div className={`workspace${collapsed ? " sidebar-collapsed" : ""}`}>
     <a className="skip-link" href="#main">{t("ප්‍රධාන අන්තර්ගතයට යන්න", "Skip to content")}</a>
     {open && <button className="sidebar-backdrop" aria-label={t("මෙනුව වසන්න", "Close menu")} onClick={() => setOpen(false)} />}
