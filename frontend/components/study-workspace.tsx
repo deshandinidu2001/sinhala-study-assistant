@@ -32,7 +32,7 @@ function WorkspaceContent({ id }: { id: string }) {
     {tool && <section className="workspace-tool-view"><Link className="secondary-button" href={`/workspaces/${id}`}>{t("සංවාදයට ආපසු", "Back to chat")}</Link>{tool === "documents" && <DocumentsLibrary/>}{tool === "reader" && params.get("document") && <DocumentReader id={params.get("document")!}/>}</section>}
     <div className="study-columns" hidden={!!tool}>
       <aside className="workspace-sources"><WorkspaceSources id={id} selected={selected} onSelect={setSelected}/></aside>
-      <section className="workspace-conversation" aria-label={t("සංවාදය", "Chat")}><ChatWorkspace key={id}/></section>
+      <section className="workspace-conversation" aria-label={t("සංවාදය", "Chat")}><ChatWorkspace key={id} selectedSources={selected}/></section>
       <aside className="workspace-studio"><h2>Studio</h2><p>{t("සටහන් සමඟ නැවත පාඩම් කරන්න.", "Make more of your notes.")}</p>{[["summaries","summary",t("සාරාංශ කරන්න","Summarize")],["practice","quiz",t("ප්‍රශ්න පුහුණුව","Quiz")],["audio-review","headphones",t("හඬ සමාලෝචනය","Audio Overview")]].map(([route, icon, label]) => <Link className="studio-tool" key={route} href={`/workspaces/${id}?tool=${route}`}><Icon name={icon as "summary"}/><span>{label}</span><Icon name="arrow" size={16}/></Link>)}</aside>
     </div>
   </div>;
