@@ -6,13 +6,14 @@ from pathlib import Path
 from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Path as ApiPath, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend import gemini
+from backend import audio_reviews
 from backend.kimi import KIMI_UNAVAILABLE
 from backend.summaries import make_summary, cached_summary, SUMMARY_NO_KEY, SUMMARY_UNAVAILABLE, SummaryOptions
 from backend.quizzes import make_mcq_quiz, NO_KEY, UNAVAILABLE
@@ -288,6 +289,48 @@ def create_summary(document_id: UUID, body: SummaryInput, db: DB) -> dict:
         raise HTTPException(422, str(error))
     except gemini.GeminiUnavailable as error:
         raise HTTPException(503, str(error) if str(error) in {SUMMARY_NO_KEY, KIMI_UNAVAILABLE} else SUMMARY_UNAVAILABLE)
+
+
+def audio_summary(document_id: UUID, db: Session, body: SummaryInput) -> dict:
+    document = require_document(db, document_id)
+    if document.status != "ready":
+        raise HTTPException(409, "ලේඛනය තවම සූදානම් නැත.")
+    summary = cached_summary(document, body.language, body.focus.strip(),
+        SummaryOptions(length=body.length, include=body.include, provider=body.provider))
+    if not summary:
+        raise HTTPException(409, "පළමුව සාරාංශයක් සකසන්න. ඉන්පසු හඬ සමාලෝචනය සාදන්න.")
+    return summary
+
+
+@router.get("/documents/{document_id}/audio-review")
+def get_audio_review(document_id: UUID, db: DB, language: Literal["si", "en"] = "si", focus: str = "", length: Literal["short", "medium", "long"] = "medium", include: str = "definitions,comparisons,advantages,disadvantages,functions,examples,processes", provider: Literal["gemini", "kimi"] = "gemini") -> dict:
+    try:
+        summary = audio_summary(document_id, db, SummaryInput(language=language, focus=focus[:500], length=length, include=include.split(","), provider=provider))
+        return {"audio": audio_reviews.cached_audio(document_id, summary)}
+    except (StudyError, ValueError) as error:
+        raise HTTPException(422, str(error))
+
+
+@router.post("/documents/{document_id}/audio-review")
+def create_audio_review(document_id: UUID, body: SummaryInput, db: DB) -> dict:
+    try:
+        return audio_reviews.make_audio(document_id, audio_summary(document_id, db, body))
+    except StudyError as error:
+        raise HTTPException(422, str(error))
+    except audio_reviews.AudioUnavailable as error:
+        raise HTTPException(503, str(error))
+    except OSError:
+        raise HTTPException(503, "හඬ ගොනුව සුරැකිය නොහැක. නැවත උත්සාහ කරන්න.")
+
+
+@router.get("/documents/{document_id}/audio/{audio_id}")
+def get_audio_file(document_id: UUID, audio_id: Annotated[str, ApiPath(pattern=r"^[a-f0-9]{64}$")], db: DB, download: bool = False) -> FileResponse:
+    require_document(db, document_id)
+    path = document_folder(document_id) / f"audio-{audio_id}.wav"
+    if not path.is_file():
+        raise HTTPException(404, "හඬ ගොනුව හමු නොවීය. හඬ සමාලෝචනය නැවත සාදන්න.")
+    return FileResponse(path, media_type="audio/wav", filename=f"audio-review-{document_id}.wav" if download else None,
+                        headers={"Cache-Control": "private, max-age=86400"})
 
 
 class QuizInput(BaseModel):
