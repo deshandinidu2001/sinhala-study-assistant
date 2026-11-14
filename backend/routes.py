@@ -409,6 +409,15 @@ def studio_outputs(db: DB) -> list[dict]:
             "language": quiz.questions[0].get("language", "si") if quiz.questions else "si",
             "created_at": quiz.created_at.isoformat(), "document_id": None})
     for document in db.scalars(select(Document)):
+        for path in document_folder(document.id).glob("audio-*.json"):
+            try:
+                value = json.loads(path.read_text(encoding="utf-8"))
+                if not path.with_suffix(".wav").is_file():
+                    continue
+                outputs.append({"id": value["id"], "type": "audio", "title": document.title,
+                    "language": value["language"], "created_at": value["generated_at"], "document_id": str(document.id)})
+            except (OSError, ValueError, KeyError):
+                continue
         for path in document_folder(document.id).glob("summary-*.json"):
             try:
                 value = json.loads(path.read_text(encoding="utf-8"))
@@ -426,3 +435,12 @@ def saved_summary(document_id: UUID, identity: Annotated[str, ApiPath(pattern=r"
         return json.loads((document_folder(document_id) / f"{identity}.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         raise HTTPException(404, "Saved summary not found")
+
+
+@router.get("/documents/{document_id}/saved-audio/{identity}")
+def saved_audio(document_id: UUID, identity: Annotated[str, ApiPath(pattern=r"^[a-f0-9]{64}$")], db: DB) -> dict:
+    require_document(db, document_id)
+    try:
+        return json.loads((document_folder(document_id) / f"audio-{identity}.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raise HTTPException(404, "Saved audio not found")

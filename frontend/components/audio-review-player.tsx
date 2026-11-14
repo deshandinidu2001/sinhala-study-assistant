@@ -47,7 +47,7 @@ export function AudioReviewPlayer({ documentId, options }: { documentId: string;
     } finally { if (!controller.signal.aborted) setBusy(false); }
   }
 
-  return <section className="audio-review tool-card" aria-label={t("හඬ සමාලෝචනය", "Audio Review")} aria-busy={busy || checking}>
+  return <section className="audio-review tool-card" aria-label={t("හඬ සමාලෝචනය", "Audio Overview")} aria-busy={busy || checking}>
     <div className="audio-review-heading"><span className="audio-review-icon"><Icon name="headphones" size={24} /></span><div><h3>{t("අසා මතක තබාගන්න", "Listen and revise")}</h3><p>{t("ඔබේ පාඩමේ සාරාංශය, හඬින්.", "Your study summary, read aloud.")}</p></div><span className="audio-language">{options.language === "si" ? "සිංහල" : "English"}</span></div>
     <p className="summary-hint">{t("හඬ සෑදීමට සාරාංශයේ අකුරු Google වෙත යවයි. මෙය AI හඬකි. කරුණු පහත මූලාශ්‍ර සමඟ පරීක්ෂා කරන්න. සුරැකි හඬ නැවත ඇසීමට සේවාව අවශ්‍ය නැත.", "Creating audio sends the summary text to Google. This is an AI voice; check facts using the sources below. Saved recordings replay without another generation request.")}</p>
     {checking && <p role="status">{t("සුරැකි හඬ පරීක්ෂා කරමින්…", "Checking for saved audio…")}</p>}
