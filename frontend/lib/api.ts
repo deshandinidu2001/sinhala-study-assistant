@@ -10,6 +10,7 @@ export class ApiError extends Error {
 }
 
 export type StudyDocument = {
+  workspace_id?: string;
   id: string; title: string; subject: string; filename: string; page_count: number;
   status: "pending" | "processing" | "ready" | "failed"; file_size: number;
   error: string | null; extraction_method: string | null; uploaded_at: string;
@@ -28,6 +29,10 @@ export type DocumentSummary = { document_id: string; title: string; language: st
 export type DocumentDetail = StudyDocument & { pages: { page: number; text: string; ocr: boolean }[] };
 
 export function apiUrl(path: string): string {
+  if (typeof window !== "undefined" && !path.startsWith("/workspaces") && path !== "/health") {
+    const match = window.location.pathname.match(/^\/workspaces\/([^/]+)/);
+    if (match) path = `/workspaces/${match[1]}${path}`;
+  }
   return `${(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "")}${path}`;
 }
 
