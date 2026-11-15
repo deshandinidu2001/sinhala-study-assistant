@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useDocuments } from "@/lib/use-documents";
 import { useLanguage } from "@/lib/language";
 import { api } from "@/lib/api";
@@ -8,8 +9,21 @@ export function WorkspaceSources({ id, selected, onSelect }: { id: string; selec
   const { documents, loading, error, refresh } = useDocuments(); const { t } = useLanguage();
   const [search, setSearch] = useState(""); const [failure, setFailure] = useState(""); const [busy, setBusy] = useState(false);
   const ready = documents.filter(d => d.status === "ready");
+  const params = useSearchParams();
+  const requested = params.get("document");
+  const appliedRequest = useRef<string | null>(null);
   const readyKey = ready.map(d => d.id).join(",");
-  useEffect(() => { if (!loading) onSelect(selected.filter(id => readyKey.split(",").includes(id))); }, [readyKey, loading]);
+  useEffect(() => {
+    if (loading) return;
+    if (requested && appliedRequest.current !== requested && readyKey.split(",").includes(requested)) {
+      appliedRequest.current = requested;
+      onSelect([requested]);
+    } else {
+      if (!requested) appliedRequest.current = null;
+      const next = selected.filter(identity => readyKey.split(",").includes(identity));
+      if (next.length !== selected.length) onSelect(next);
+    }
+  }, [readyKey, loading, requested, selected, onSelect]);
   async function action(path: string, method: string) { setBusy(true); setFailure(""); try { await api(path,{method}); await refresh(); } catch(e) { setFailure((e as Error).message); } finally { setBusy(false); } }
   return <><div className="section-heading"><h2>{t("මූලාශ්‍ර","Sources")}</h2><span>{documents.length}</span></div><Link className="primary-button source-upload" href={`/workspaces/${id}?tool=documents#upload`}>{t("ගොනු හෝ සටහන් එක් කරන්න","Add files or notes")}</Link>
     <input aria-label={t("මූලාශ්‍ර සොයන්න","Search sources")} placeholder={t("මූලාශ්‍ර සොයන්න…","Search sources…")} value={search} onChange={e => setSearch(e.target.value)}/>

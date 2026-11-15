@@ -146,11 +146,11 @@ Select a source or subject, choose Sinhala or English under **Question language*
 
 Validation rejects missing-word stems, duplicate questions/options, invalid answer indices, invalid sources, ungrounded evidence, and a missing skill mix. A second Gemini call reviews question clarity, the answer key, source support, and distractor plausibility. A quote may be recovered from a substantial verbatim span when the model uses an original page number or an ellipsis; the displayed quote is always taken from the actual source text. These checks reduce poor output but do not guarantee factual correctness or official syllabus alignment. Verify important facts against the cited page.
 
-Generation and review have 30-second and 20-second provider timeouts. If a key, service, or quality check fails, the app asks you to retry or choose more material. It does not generate a lower-quality fallback. Quiz questions, answers and feedback are saved in PostgreSQL; no migration is needed. Existing saved quizzes are retained.
+Generation and review have 30-second and 20-second provider timeouts. If a key, service, or quality check fails, the app asks you to retry or choose more material. It does not generate a lower-quality fallback. Quiz questions, answers and submitted feedback are saved in PostgreSQL. Existing saved quizzes are retained by the workspace migration.
 
-## Audio Review
+## Audio Overview
 
-Open **Audio Review** in the sidebar, or choose it on a source card or in the reader. Select a ready source, Sinhala or English, and the topics to cover. Choose **Prepare review script**, check its cited summary, then **Create audio review**. Existing summaries also offer the audio player.
+Open a workspace and choose **Audio Overview** in Studio, or choose it on a source card or in the reader. Select a ready source, Sinhala or English, and the topics to cover. Choose **Prepare review script**, check its cited summary, then **Create audio review**. Existing summaries also offer the audio player.
 
 The player supports play/pause, seeking, playback speeds from 0.75× to 2×, a narration transcript, and WAV downloads. Recordings are saved beside the document under `storage/` and restored when the same summary settings are selected. Replaying or downloading a saved recording does not call Gemini again. Deleting the document deletes its saved recordings. Back up storage together with the database.
 
@@ -177,3 +177,13 @@ Select **Kimi K3 · Docker** in Summary provider. The backend calls the OpenAI-c
 Local verification on 2026-11-13: the requested Docker command reported a **1.56 TB** model download. The download was stopped; Kimi inference was not verified on this machine. The adapter is tested with controlled OpenAI-compatible responses, including malformed/truncated output. Selecting Kimi before it is available displays a message to start the model or choose Gemini. Gemini remains the default.
 
 References: [Kimi K3 model card and Docker command](https://huggingface.co/moonshotai/Kimi-K3), [Docker Model Runner API and container/host addresses](https://docs.docker.com/ai/model-runner/api-reference/).
+
+## Workspace study flow
+
+Open the home page, create or select a workspace, then add files or paste notes in **Sources**. Rename a workspace from its card or heading. Select ready sources to enable **Main Chat**; clearing the selection disables sending. **Studio** contains Summarize, Quiz and Audio Overview, plus saved outputs. On mobile, switch between Sources, Chat and Studio using the tabs. Existing document links open their owning workspace.
+
+Workspace names, sources, chats and quiz results persist in PostgreSQL. Retrieval filters by workspace and selected source IDs before ranking. Summary and recording caches retain their original document IDs and storage paths; Studio discovers saved outputs through documents owned by the current workspace. Scoped endpoints reject documents and quizzes belonging to another workspace. This is organization within one trusted local application, not authentication or isolation between users.
+
+Alembic migration `0004_workspaces` assigns existing documents, chats and quizzes to **My study workspace**, preserving IDs, citations, originals, cached summaries and recordings. Back up PostgreSQL and the entire storage directory together before upgrading. Use `alembic -c backend/alembic.ini upgrade head`; do not delete or recreate volumes. The workspace migration also adds persisted submitted quiz results; pre-migration attempts have no stored result, but their quizzes remain available to answer again.
+
+See [workspace verification](docs/workspaces.md) for the migration and browser checks, including the distinction between controlled provider tests and existing real recordings.

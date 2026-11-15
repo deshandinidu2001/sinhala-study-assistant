@@ -202,6 +202,8 @@ def chat_data(chat: Chat) -> dict:
 
 
 def question_vocabulary(db: Session, body: QuestionInput) -> set[str]:
+    if body.document_id:
+        require_document(db, body.document_id)
     if body.document_ids is not None:
         if not body.document_ids:
             raise HTTPException(422, "Select at least one ready source")
@@ -405,9 +407,10 @@ def get_quiz(quiz_id: UUID, db: DB) -> dict:
 def studio_outputs(db: DB) -> list[dict]:
     outputs = []
     for quiz in db.scalars(select(Quiz).order_by(Quiz.created_at.desc())):
-        outputs.append({"id": str(quiz.id), "type": "quiz", "title": quiz.subject,
+        source = quiz.questions[0].get("source", {}) if quiz.questions else {}
+        outputs.append({"id": str(quiz.id), "type": "quiz", "title": source.get("title") or quiz.subject,
             "language": quiz.questions[0].get("language", "si") if quiz.questions else "si",
-            "created_at": quiz.created_at.isoformat(), "document_id": None})
+            "created_at": quiz.created_at.isoformat(), "document_id": source.get("document_id")})
     for document in db.scalars(select(Document)):
         for path in document_folder(document.id).glob("audio-*.json"):
             try:

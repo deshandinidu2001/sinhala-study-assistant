@@ -5,7 +5,7 @@ from functools import lru_cache
 
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session
-from sqlalchemy import event
+from sqlalchemy import event, update, func
 from sqlalchemy.orm import with_loader_criteria
 from fastapi import Request, HTTPException
 from uuid import UUID
@@ -23,6 +23,13 @@ def get_engine() -> Engine:
         max_overflow=10,
         connect_args={"connect_timeout": 5},
     )
+
+
+@event.listens_for(Session, "before_flush")
+def touch_workspace(session, context, instances):
+    identities = {item.workspace_id or DEFAULT_WORKSPACE for item in list(session.new) + list(session.dirty) + list(session.deleted) if isinstance(item, (Document, Chat, Quiz))}
+    if identities:
+        session.execute(update(Workspace).where(Workspace.id.in_(identities)).values(updated_at=func.now()))
 
 
 @event.listens_for(Session, "do_orm_execute")

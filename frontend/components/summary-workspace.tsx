@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import Link from "@/components/scoped-link";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, type DocumentSummary } from "@/lib/api";
@@ -30,7 +30,8 @@ export function SummaryWorkspace({ audioReview = false }: { audioReview?: boolea
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const ready = documents.filter(document => document.status === "ready");
-  const documentId = ready.some(document => document.id === selected) ? selected : ready[0]?.id ?? "";
+  const invalidSource = !loading && !!selected && !ready.some(document => document.id === selected);
+  const documentId = selected ? (invalidSource ? "" : ready.find(document => document.id === selected)?.id ?? "") : ready[0]?.id ?? "";
   useEffect(() => setOutputLanguage(language), [language]);
   useEffect(() => setSelected(params.get("document") ?? ""), [params]);
   useEffect(() => {
@@ -63,7 +64,8 @@ export function SummaryWorkspace({ audioReview = false }: { audioReview?: boolea
   return <div className="overview tool-page summary-page">
     <div className="page-intro"><h1>{audioReview ? t("හඬ සමාලෝචනය", "Audio Overview") : t("සාරාංශ", "Summaries")}</h1><p>{audioReview ? t("සාරාංශයක් සකසා, අසා නැවත පාඩම් කරන්න.", "Prepare a review script, then listen to your notes.") : t("වැදගත් කරුණු, සරලව.", "The points worth keeping.")}</p></div>
     {documentsError && <p className="notice error" role="alert">{t(documentsError)}</p>}
-    {!loading && !ready.length ? <div className="empty-state tool-card"><Icon name="summary" size={34} /><h2>{t("සාරාංශයක් සඳහා ලේඛනයක් එක් කරන්න", "Add a source to summarize")}</h2><Link className="primary-button" href="/documents#upload">{t("ලේඛනයක් එක් කරන්න")}</Link></div> : <section className="tool-card summary-setup" aria-label={t("සාරාංශය සකසන්න", "Summary settings")}>
+    {invalidSource && <p role="alert" className="notice error">{t("මෙම මූලාශ්‍රය මෙම අවකාශයේ නොමැත හෝ තවම සූදානම් නැත.", "This source is unavailable in this workspace or is not ready. Select a ready source.")}</p>}
+    {!loading && !ready.length ? <div className="empty-state tool-card"><Icon name="summary" size={34} /><h2>{t("සාරාංශයක් සඳහා ලේඛනයක් එක් කරන්න", "Add a source to summarize")}</h2><Link className="primary-button" href="/documents#upload">{t("ලේඛනයක් එක් කරන්න")}</Link></div> : <section hidden={!!params.get("summary")} className="tool-card summary-setup" aria-label={t("සාරාංශය සකසන්න", "Summary settings")}>
       <div className="scope-bar"><label>{t("ලේඛනය")}<select value={documentId} disabled={busy} onChange={event => setSelected(event.target.value)}>{ready.map(document => <option value={document.id} key={document.id}>{document.title}</option>)}</select></label><label>{t("සාරාංශ භාෂාව", "Summary language")}<select value={outputLanguage} disabled={busy} onChange={event => setOutputLanguage(event.target.value as "si" | "en")}><option value="si">සිංහල</option><option value="en">English</option></select></label></div>
       <label>{t("අවධානය යොමු කළ යුතු කරුණු", "Focus on")}<input value={focus} maxLength={500} disabled={busy} onChange={event => setFocus(event.target.value)} placeholder={t("විකල්පයි: අර්ථ දැක්වීම්, වෙනස්කම්, කාර්යයන්…", "Optional: definitions, differences, functions…")} /></label>
       <div className="scope-bar summary-options">

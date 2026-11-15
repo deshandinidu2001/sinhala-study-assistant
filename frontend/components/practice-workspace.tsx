@@ -1,6 +1,6 @@
 "use client";
 import { useLanguage } from "@/lib/language";
-import Link from "next/link";
+import Link from "@/components/scoped-link";
 import { useEffect, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, type Quiz, type QuizResult } from "@/lib/api";
@@ -23,7 +23,7 @@ export function PracticeWorkspace() {
     useEffect(() => {
       const saved = params.get("quiz"); if (!saved) return;
       const controller = new AbortController();
-      api<Quiz & { result: QuizResult | null }>(`/quizzes/${saved}`, { signal: controller.signal }).then(value => { setQuiz(value); setAnswers(value.questions.map(() => -1)); setResult(value.result); }).catch(e => { if (!controller.signal.aborted) setError(e.message); });
+      api<Quiz & { result: QuizResult | null }>(`/quizzes/${saved}`, { signal: controller.signal }).then(value => { setQuiz(value); setAnswers(value.result?.questions.map(q => q.selected_index) ?? value.questions.map(() => -1)); setResult(value.result); }).catch(e => { if (!controller.signal.aborted) setError(e.message); });
       return () => controller.abort();
     }, [params]);
     const ready = documents.filter(d => d.status === "ready");

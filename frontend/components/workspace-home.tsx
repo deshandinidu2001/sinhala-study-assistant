@@ -18,7 +18,7 @@ export function WorkspaceForm({ initial, onSaved, onCancel }: { initial?: Worksp
     try { onSaved(await api<Workspace>(initial ? `/workspaces/${initial.id}` : "/workspaces", { method: "POST", body: JSON.stringify({ name: name.trim(), description: description.trim() }) })); }
     catch (failure) { setError((failure as Error).message); } finally { setBusy(false); }
   }
-  return <form className="workspace-editor" onSubmit={save} aria-label={initial ? t("නම වෙනස් කරන්න", "Rename workspace") : t("අලුත් අවකාශයක්", "Create workspace")}>
+  return <form className="workspace-editor" onSubmit={save} onKeyDown={event => { if (event.key === "Escape" && !busy) onCancel(); }} aria-label={initial ? t("නම වෙනස් කරන්න", "Rename workspace") : t("අලුත් අවකාශයක්", "Create workspace")}>
     <label>{t("අවකාශයේ නම", "Workspace name")}<input autoFocus required maxLength={120} value={name} onChange={e => setName(e.target.value)} disabled={busy} /></label>
     <label>{t("කෙටි විස්තරයක් (විකල්පයි)", "Description (optional)")}<input maxLength={500} value={description} onChange={e => setDescription(e.target.value)} disabled={busy} /></label>
     {error && <p role="alert" className="notice error">{t(error)}</p>}

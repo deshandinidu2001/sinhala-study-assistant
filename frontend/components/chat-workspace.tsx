@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import Link from "@/components/scoped-link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, type Chat } from "@/lib/api";
@@ -38,11 +38,13 @@ export function ChatWorkspace({ selectedSources }: { selectedSources?: string[] 
   const [listening, setListening] = useState(false);
   const [voiceNotice, setVoiceNotice] = useState("");
   const recognition = useRef<Recognition | null>(null);
+  const requests = useRef<AbortController | null>(null);
+  useEffect(() => { const controller = new AbortController(); requests.current = controller; return () => controller.abort(); }, []);
   const thread = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
   const ready = documents.filter(document => document.status === "ready");
   const subjects = [...new Set(ready.map(document => document.subject))].sort();
-  const validSelected = ready.some(document => document.id === selected && (!subject || document.subject === subject)) ? selected : "";
+  const validSelected = selectedSources !== undefined ? "" : ready.some(document => document.id === selected && (!subject || document.subject === subject)) ? selected : "";
   const scope = { subject: subject || null, document_id: validSelected || null, ...(selectedSources !== undefined ? { document_ids: selectedSources } : {}) };
   const noSelection = selectedSources !== undefined && !selectedSources.length;
   const sourceOptions = ready.filter(document => (!subject || document.subject === subject) && `${document.title} ${document.subject}`.toLowerCase().includes(sourceSearch.toLowerCase()));
@@ -71,10 +73,10 @@ export function ChatWorkspace({ selectedSources }: { selectedSources?: string[] 
   }
   useEffect(() => setAnimatedAnswer(null), [selected, subject]);
   async function interpret() {
-    if (busy || interpreting || question.trim().length < 2) return;
+    if (busy || interpreting || noSelection || question.trim().length < 2) return;
     recognition.current?.abort(); setInterpreting(true); setError("");
     try {
-      const result = await api<{ question: string; notice?: string }>("/questions/normalize", { method: "POST", body: JSON.stringify({ question, language: inputLanguage, ...scope }) });
+      const result = await api<{ question: string; notice?: string }>("/questions/normalize", { method: "POST", signal: requests.current?.signal, body: JSON.stringify({ question, language: inputLanguage, ...scope }) });
       setInterpretation(result.question); setInterpretNotice(result.notice ?? "");
     } catch (failure) { setError(failure instanceof Error ? failure.message : t("ප්‍රශ්නය කියවිය නොහැක.", "Could not interpret this question.")); }
     finally { setInterpreting(false); }
@@ -83,7 +85,7 @@ export function ChatWorkspace({ selectedSources }: { selectedSources?: string[] 
     event.preventDefault(); if (busy || interpreting || question.trim().length < 2 || (!ready.length || noSelection)) return;
     recognition.current?.abort(); setBusy(true); setError(""); setVoiceNotice("");
     try {
-      const chat = await api<Chat>("/chat", { method: "POST", body: JSON.stringify({ question: question.trim(), language: inputLanguage, answer_language: interfaceLanguage, ...scope }) });
+      const chat = await api<Chat>("/chat", { method: "POST", signal: requests.current?.signal, body: JSON.stringify({ question: question.trim(), language: inputLanguage, answer_language: interfaceLanguage, ...scope }) });
       setAnimatedAnswer(chat.id); setChats(previous => [...previous, chat]); setQuestion("");
       requestAnimationFrame(() => composer.current?.focus());
     } catch (failure) { setError(failure instanceof Error ? failure.message : t("පිළිතුර ලබාගත නොහැක.", "Could not get an answer.")); }
@@ -128,10 +130,10 @@ export function ChatWorkspace({ selectedSources }: { selectedSources?: string[] 
           {interpretation && <div className="question-interpretation"><div className="section-heading"><label htmlFor="interpreted-question">{t("සිංහල ප්‍රශ්නය පරීක්ෂා කරන්න", "Check the Sinhala question")}</label><button type="button" className="icon-button" aria-label={t("අවලංගු කරන්න")} onClick={() => { setInterpretation(""); setInterpretNotice(""); }}><Icon name="close" size={17} /></button></div><textarea id="interpreted-question" value={interpretation} onChange={event => setInterpretation(event.target.value)} rows={2} maxLength={2000} /><button type="button" className="text-button" disabled={busy || !interpretation.trim()} onClick={() => { setQuestion(interpretation); setInputLanguage("original"); composer.current?.focus(); }}>{t("මෙම ප්‍රශ්නය භාවිත කරන්න", "Use this question")}</button>{interpretNotice && <p className="voice-notice">{t(interpretNotice)}</p>}</div>}
           <label className="sr-only" htmlFor="question">{t("ඔබේ ප්‍රශ්නය", "Your question")}</label><textarea ref={composer} id="question" rows={2} value={question} onChange={event => setQuestion(event.target.value)} onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} maxLength={2000} minLength={2} required disabled={busy || interpreting || (!ready.length || noSelection)} placeholder={t("ප්‍රශ්නයක් ලියන්න…", "Ask a question about your notes…")} />
           <div className="question-actions"><label className="input-language"><span className="sr-only">{t("ලියන ආකාරය", "Input language")}</span><select aria-label={t("ලියන ආකාරය", "Input language")} id="question-language" value={inputLanguage} disabled={busy || interpreting} onChange={event => setInputLanguage(event.target.value)}><option value="auto">{t("ස්වයංක්‍රීය", "Auto")}</option><option value="singlish">Singlish</option><option value="original">සිංහල / English</option></select></label><button type="button" className="preview-button" disabled={busy || interpreting || question.trim().length < 2} onClick={interpret}>{interpreting ? t("කියවමින්…", "Checking…") : t("සිංහලෙන් බලන්න", "Check Singlish")}</button><div className="composer-end">{question.length > 1800 && <small>{question.length}/2000</small>}{voiceSupported && <button className={`icon-button${listening ? " recording" : ""}`} type="button" aria-label={listening ? t("හඬ නවත්වන්න", "Stop dictation") : t("හඬින් ලියන්න", "Dictate question")} disabled={busy || interpreting || (!ready.length || noSelection)} onClick={voice}><Icon name="mic" size={18} /></button>}<button className="send-button" type="submit" aria-label={t("ප්‍රශ්නය යවන්න", "Send question")} disabled={busy || interpreting || question.trim().length < 2 || (!ready.length || noSelection)}><Icon name="arrow" size={19} /></button></div></div>
-        </form><p className="composer-hint">{validSelected ? ready.find(document => document.id === validSelected)?.title : t("සියලු සූදානම් ලේඛන")}<span>{t("මූලාශ්‍ර සමඟ පරීක්ෂා කරන්න.", "Check answers against your sources.")}</span></p>
+        </form><p className="composer-hint">{selectedSources !== undefined ? `${selectedSources.length} ${t("මූලාශ්‍ර", "sources")}` : validSelected ? ready.find(document => document.id === validSelected)?.title : t("සියලු සූදානම් ලේඛන")}<span>{t("මූලාශ්‍ර සමඟ පරීක්ෂා කරන්න.", "Check answers against your sources.")}</span></p>
       </div>
     </section>
-    {sourcesOpen && <aside id="chat-sources" className="source-rail" aria-label={t("සංවාද මූලාශ්‍ර", "Conversation sources")}><div className="section-heading"><h2>{t("මූලාශ්‍ර", "Sources")}</h2><button className="icon-button" aria-label={t("මූලාශ්‍ර වසන්න", "Close sources")} onClick={() => setSourcesOpen(false)}><Icon name="close" size={17} /></button></div><label htmlFor="chat-subject">{t("විෂය")}</label><select id="chat-subject" value={subject} onChange={event => { setSubject(event.target.value); setSelected(""); }} disabled={busy || interpreting}><option value="">{t("සියලු විෂයන්")}</option>{subjects.map(value => <option key={value}>{value}</option>)}</select><input className="source-search" aria-label={t("ලේඛන සොයන්න")} placeholder={t("ලේඛන සොයන්න", "Find a source…")} value={sourceSearch} onChange={event => setSourceSearch(event.target.value)} />
+    {selectedSources === undefined && sourcesOpen && <aside id="chat-sources" className="source-rail" aria-label={t("සංවාද මූලාශ්‍ර", "Conversation sources")}><div className="section-heading"><h2>{t("මූලාශ්‍ර", "Sources")}</h2><button className="icon-button" aria-label={t("මූලාශ්‍ර වසන්න", "Close sources")} onClick={() => setSourcesOpen(false)}><Icon name="close" size={17} /></button></div><label htmlFor="chat-subject">{t("විෂය")}</label><select id="chat-subject" value={subject} onChange={event => { setSubject(event.target.value); setSelected(""); }} disabled={busy || interpreting}><option value="">{t("සියලු විෂයන්")}</option>{subjects.map(value => <option key={value}>{value}</option>)}</select><input className="source-search" aria-label={t("ලේඛන සොයන්න")} placeholder={t("ලේඛන සොයන්න", "Find a source…")} value={sourceSearch} onChange={event => setSourceSearch(event.target.value)} />
       <div className="source-picker" role="radiogroup" aria-label={t("ලේඛනය තෝරන්න", "Choose source")}><label className={`source-choice all-sources${!validSelected ? " active" : ""}`}><input type="radio" name="chat-source" checked={!validSelected} onChange={() => setSelected("")} disabled={busy || interpreting} /><Icon name="book" size={19} /><span>{t("සියලු සූදානම් ලේඛන")}<small>{ready.filter(document => !subject || document.subject === subject).length} {t("ලේඛන", "sources")}</small></span></label>{sourceOptions.map(document => <label key={document.id} className={`source-choice${validSelected === document.id ? " active" : ""}`}><input type="radio" name="chat-source" checked={validSelected === document.id} onChange={() => { setSelected(document.id); if (window.innerWidth <= 1100) setSourcesOpen(false); }} disabled={busy || interpreting} /><Icon name="document" size={19} /><span>{document.title}<small>{document.page_count} {t("පිටු")} · {document.subject}</small></span></label>)}</div>
       {!sourceOptions.length && <p className="rail-empty">{loading ? t("ලේඛන ලබාගනිමින්…") : t("ගැළපෙන ලේඛන නැත")}</p>}<Link className="rail-add" href="/documents#upload"><Icon name="plus" size={16} />{t("ලේඛනයක් එක් කරන්න")}</Link>{validSelected && <div className="rail-tools"><Link className="secondary-button" href={`/documents/${validSelected}`}><Icon name="book" size={16} />{t("කියවන්න")}</Link><Link className="secondary-button" href={`/practice?document=${validSelected}`}><Icon name="quiz" size={16} />{t("පුහුණු වන්න")}</Link></div>}
     </aside>}

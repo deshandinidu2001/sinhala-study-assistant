@@ -1,14 +1,16 @@
 "use client";
 import { useLanguage } from "@/lib/language";
-import Link from "next/link";
+import Link from "@/components/scoped-link";
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { api, apiUrl, type DocumentDetail } from "@/lib/api";
 export function DocumentReader({ id }: {
     id: string;
 }) {
     const { t } = useLanguage();
     const search = useSearchParams();
+    const params = useParams<{ workspaceId?: string }>();
+    const router = useRouter();
     const [document, setDocument] = useState<DocumentDetail | null>(null);
     const [error, setError] = useState("");
     const [attempt, setAttempt] = useState(0);
@@ -59,12 +61,12 @@ export function DocumentReader({ id }: {
     return <div className="overview tool-page reader-page">
     <Link className="back-link" href="/documents">{t("← ලේඛන එකතුව")}</Link>
     <div className="page-intro"><p className="welcome">{document.subject}</p><h1>{document.title}</h1><p>{document.filename} · {document.page_count} {section ? t("කොටස්") : t("පිටු")}</p></div>
-    <div className="reader-actions"><Link className="primary-button" href={`/chat?document=${id}`}>{t("මෙම පාඩමෙන් ප්‍රශ්න අහන්න")}</Link><Link className="secondary-button" href={`/summaries?document=${id}`}>{t("සාරාංශ කරන්න", "Summarize")}</Link><Link className="secondary-button" href={`/audio-review?document=${id}`}>{t("හඬ සමාලෝචනය", "Audio Review")}</Link><Link className="secondary-button" href={`/practice?document=${id}`}>{t("පුහුණු වන්න")}</Link><a className="text-button" href={apiUrl(`/documents/${id}/file`)} target="_blank" rel="noreferrer">{t("මුල් ගොනුව විවෘත කරන්න ↗")}</a></div>
+    <div className="reader-actions"><Link className="primary-button" href={`/chat?document=${id}`}>{t("මෙම පාඩමෙන් ප්‍රශ්න අහන්න")}</Link><Link className="secondary-button" href={`/summaries?document=${id}`}>{t("සාරාංශ කරන්න", "Summarize")}</Link><Link className="secondary-button" href={`/audio-review?document=${id}`}>{t("හඬ සමාලෝචනය", "Audio Overview")}</Link><Link className="secondary-button" href={`/practice?document=${id}`}>{t("පුහුණු වන්න")}</Link><a className="text-button" href={apiUrl(`/documents/${id}/file`)} target="_blank" rel="noreferrer">{t("මුල් ගොනුව විවෘත කරන්න ↗")}</a></div>
     {actionError && <p className="notice error" role="alert">{t(actionError)}</p>}
     {pdf && <div className="reader-view-controls"><div role="group" aria-label={t("කියවීමේ ආකාරය")}><button className="secondary-button" aria-pressed={!textView} onClick={() => setTextView(false)}>{t("මුල් PDF පිටුව")}</button><button className="secondary-button" aria-pressed={textView} onClick={() => setTextView(true)}>{t("හඳුනාගත් අකුරු")}</button></div><button className="text-button" onClick={reprocess} disabled={reprocessing || !["ready", "failed"].includes(document.status)}>{reprocessing ? t("සකසමින්…") : t("අකුරු නැවත හඳුනාගන්න")}</button></div>}
     {section && <p className="notice">{t("මෙම ගොනු වර්ගයේ ස්ථාවර පිටු අංක නැති නිසා අකුරු කොටස් ලෙස පෙන්වයි. මූලාශ්‍රවල අංක මෙම කොටස්වලට යොමු වේ.")}</p>}
     {document.status !== "ready" ? <div className="empty-state"><h2>{t("ලේඛනය තවම සූදානම් නැත")}</h2><p>{document.error ?? t("අකුරු කියවමින් පවතී. ලේඛන එකතුවේ තත්ත්වය බලන්න.")}</p><Link href="/documents" className="primary-button">{t("ලේඛන එකතුව බලන්න")}</Link></div> : <>
-      <nav className="page-controls" aria-label={t("ලේඛනයේ පිටු")}><Link className={`secondary-button${number === 1 ? " disabled" : ""}`} href={`/documents/${id}?page=${Math.max(1, number - 1)}`} aria-disabled={number === 1} tabIndex={number === 1 ? -1 : 0}>{t("පෙර")}</Link><label>{section ? t("කොටස") : t("පිටුව")}<select aria-label={section ? t("කොටස තෝරන්න") : t("පිටුව තෝරන්න")} value={number} onChange={e => { window.location.assign(`/documents/${id}?page=${e.target.value}`); }}>{document.pages.map(p => <option key={p.page} value={p.page}>{p.page} / {document.page_count}</option>)}</select></label><Link className={`secondary-button${number === document.page_count ? " disabled" : ""}`} href={`/documents/${id}?page=${Math.min(document.page_count, number + 1)}`} aria-disabled={number === document.page_count} tabIndex={number === document.page_count ? -1 : 0}>{t("ඊළඟ")}</Link></nav>
+      <nav className="page-controls" aria-label={t("ලේඛනයේ පිටු")}><Link className={`secondary-button${number === 1 ? " disabled" : ""}`} href={`/documents/${id}?page=${Math.max(1, number - 1)}`} aria-disabled={number === 1} tabIndex={number === 1 ? -1 : 0}>{t("පෙර")}</Link><label>{section ? t("කොටස") : t("පිටුව")}<select aria-label={section ? t("කොටස තෝරන්න") : t("පිටුව තෝරන්න")} value={number} onChange={e => { router.push(params?.workspaceId ? `/workspaces/${params.workspaceId}?tool=reader&document=${id}&page=${e.target.value}` : `/documents/${id}?page=${e.target.value}`); }}>{document.pages.map(p => <option key={p.page} value={p.page}>{p.page} / {document.page_count}</option>)}</select></label><Link className={`secondary-button${number === document.page_count ? " disabled" : ""}`} href={`/documents/${id}?page=${Math.min(document.page_count, number + 1)}`} aria-disabled={number === document.page_count} tabIndex={number === document.page_count ? -1 : 0}>{t("ඊළඟ")}</Link></nav>
       {(!pdf || textView) && page?.ocr && <p className="notice">{t("මෙම පිටුවේ අකුරු ස්වයංක්‍රීයව හඳුනාගෙන ඇත. අංක සහ අක්ෂර මුල් පිටුව සමඟ පරීක්ෂා කරන්න.")}</p>}
       {pdf && !textView ? <div className="pdf-page" aria-label={`${t("මුල් PDF පිටුව")} ${number}`}>
         {imageLoading && !imageError && <p role="status">{t("PDF පිටුව පූරණය වෙමින්…")}</p>}
