@@ -150,7 +150,7 @@ Generation and review have 30-second and 20-second provider timeouts. If a key, 
 
 ## Audio Overview
 
-Open a workspace and choose **Audio Overview** in Studio, or choose it on a source card or in the reader. Select a ready source, Sinhala or English, and the topics to cover. Choose **Prepare review script**, check its cited summary, then **Create audio review**. Existing summaries also offer the audio player.
+Open a workspace and choose **Audio Overview** in Studio, or choose it on a source card or in the reader. Select a ready source, Sinhala or English, and Short, Medium or Detailed on the length bar. Use Focus on for a particular topic. Choose **Prepare review script**, check its cited summary, then **Create audio review**. Existing summaries also offer the audio player.
 
 The player supports play/pause, seeking, playback speeds from 0.75× to 2×, a narration transcript, and WAV downloads. Recordings are saved beside the document under `storage/` and restored when the same summary settings are selected. Replaying or downloading a saved recording does not call Gemini again. Deleting the document deletes its saved recordings. Back up storage together with the database.
 
@@ -162,9 +162,9 @@ Implementation reference: [Google Gemini speech generation](https://ai.google.de
 
 ## Paragraph summaries and optional Kimi
 
-Summaries now provide connected paragraphs under topic headings plus cited key points for revision. Choose short (about 30–50 words per paragraph), medium (50–80), or detailed (80–120). These are approximate targets, not strict word counts. Select definitions, comparisons, advantages, disadvantages, functions, examples, processes, or all topics. Only information supported by the uploaded source belongs in the summary; requested topics absent from the source are noted rather than invented. Long pages may be sampled, and the interface displays a coverage notice. AI summaries still need checking against the original.
+Summaries now provide connected paragraphs under topic headings plus cited key points for revision. Choose short (about 30–50 words per paragraph), medium (50–80), or detailed (80–120). These are approximate targets, not strict word counts. Use the Short / Medium / Detailed bar to select length. Relevant definitions, comparisons, advantages, disadvantages, functions, examples and processes are covered automatically. Only information supported by the uploaded source belongs in the summary; requested topics absent from the source are noted rather than invented. Long pages may be sampled, and the interface displays a coverage notice. AI summaries still need checking against the original.
 
-Sinhala output is checked for Sinhala script before saving. Generation and evidence/language failures get one retry. Both providers use the same source-evidence validation and cache, separated by document content, language, focus, length, selected topics and provider. Key terms are omitted when definitions are deselected.
+Sinhala output is checked for Sinhala script before saving. Generation and evidence/language failures get one retry. Both providers use the same source-evidence validation and cache, separated by document content, language, focus, length, selected topics and provider. The API retains topic options for existing saved summaries; the interface uses all topics automatically.
 
 To use Kimi for summaries, enable Docker Model Runner in Docker Desktop and run:
 

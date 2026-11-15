@@ -18,12 +18,7 @@ export function SummaryWorkspace({ audioReview = false }: { audioReview?: boolea
   const [outputLanguage, setOutputLanguage] = useState<"si" | "en">(language);
   const [length, setLength] = useState(audioReview ? "short" : "medium");
   const [provider, setProvider] = useState("gemini");
-  const contentChoices = [
-    ["definitions", t("අර්ථ දැක්වීම්", "Definitions")], ["comparisons", t("සැසඳීම් හා වෙනස්කම්", "Comparisons")],
-    ["advantages", t("වාසි", "Advantages")], ["disadvantages", t("අවාසි හා සීමා", "Disadvantages")],
-    ["functions", t("කාර්යයන්", "Functions")], ["examples", t("උදාහරණ", "Examples")], ["processes", t("ක්‍රියාවලි", "Processes")],
-  ];
-  const [include, setInclude] = useState<string[]>(["definitions", "comparisons", "advantages", "disadvantages", "functions", "examples", "processes"]);
+  const include = ["definitions", "comparisons", "advantages", "disadvantages", "functions", "examples", "processes"];
   const optionQuery = `&length=${length}&provider=${provider}&include=${include.join(",")}`;
   const [focus, setFocus] = useState("");
   const [summary, setSummary] = useState<DocumentSummary | null>(null);
@@ -69,16 +64,13 @@ export function SummaryWorkspace({ audioReview = false }: { audioReview?: boolea
       <div className="scope-bar"><label>{t("ලේඛනය")}<select value={documentId} disabled={busy} onChange={event => setSelected(event.target.value)}>{ready.map(document => <option value={document.id} key={document.id}>{document.title}</option>)}</select></label><label>{t("සාරාංශ භාෂාව", "Summary language")}<select value={outputLanguage} disabled={busy} onChange={event => setOutputLanguage(event.target.value as "si" | "en")}><option value="si">සිංහල</option><option value="en">English</option></select></label></div>
       <label>{t("අවධානය යොමු කළ යුතු කරුණු", "Focus on")}<input value={focus} maxLength={500} disabled={busy} onChange={event => setFocus(event.target.value)} placeholder={t("විකල්පයි: අර්ථ දැක්වීම්, වෙනස්කම්, කාර්යයන්…", "Optional: definitions, differences, functions…")} /></label>
       <div className="scope-bar summary-options">
-        <label>{t("ඡේදවල දිග", "Paragraph length")}<select disabled={busy} value={length} onChange={event => setLength(event.target.value)}>
-          <option value="short">{t("කෙටි · වචන 30–50", "Short · 30–50 words")}</option><option value="medium">{t("මධ්‍යම · වචන 50–80", "Medium · 50–80 words")}</option><option value="long">{t("විස්තරාත්මක · වචන 80–120", "Detailed · 80–120 words")}</option>
-        </select></label>
+        <fieldset className="summary-length" disabled={busy}>
+          <legend>{t("සාරාංශයේ දිග", "Summary length")}</legend>
+          <div className="summary-length-bar">{[["short", t("කෙටි", "Short")], ["medium", t("මධ්‍යම", "Medium")], ["long", t("විස්තරාත්මක", "Detailed")]].map(([value, label]) => <label key={value}><input type="radio" name="summary-length" value={value} checked={length === value} onChange={() => setLength(value)} /><span>{label}</span></label>)}</div>
+        </fieldset>
         <label>{t("සාරාංශ සේවාව", "Summary provider")}<select disabled={busy} value={provider} onChange={event => setProvider(event.target.value)}><option value="gemini">Gemini</option><option value="kimi">Kimi K3 · Docker</option></select></label>
       </div>
-      <fieldset className="summary-content" disabled={busy}><legend>{t("ඇතුළත් කළ යුතු කරුණු", "Include in the summary")}</legend>
-        <label><input type="checkbox" checked={include.length === contentChoices.length} onChange={event => setInclude(event.target.checked ? contentChoices.map(([key]) => key) : [])} />{t("සියල්ල", "All topics")}</label>
-        {contentChoices.map(([key, label]) => <label key={key}><input type="checkbox" checked={include.includes(key)} onChange={event => setInclude(current => event.target.checked ? [...current, key] : current.filter(value => value !== key))} />{label}</label>)}
-      </fieldset>
-      <p className="summary-hint">{t("වචන ගණන ආසන්න අගයකි. මුල් ලේඛනයේ ඇති තොරතුරු පමණක් ඇතුළත් වේ. නොමැති කරුණු සඳහන් කරයි.", "Word counts are approximate. Only source-supported information is included; missing topics are noted.")}</p>
+      <p className="summary-hint">{t("ඔබට අවශ්‍ය විස්තර ප්‍රමාණය තෝරන්න. සාරාංශය ඔබේ මූලාශ්‍ර ඇසුරින් සකසයි.", "Choose how much detail you need. Summaries use the information in your sources.")}</p>
       <div className="form-actions"><p>{t("ප්‍රධාන කරුණු, වචන අර්ථ සහ මතක තබාගත යුතු දේ.", "Key concepts, definitions and revision points.")}</p><button className="primary-button" onClick={generate} disabled={busy || !documentId || !include.length}><Icon name="summary" size={17} />{busy ? t("සකසමින්…") : summary ? t("නැවත සකසන්න", "Regenerate") : audioReview ? t("කියවන සාරාංශය සකසන්න", "Prepare review script") : t("සාරාංශ කරන්න", "Summarize")}</button></div>
     </section>}
     {error && <p className="notice error" role="alert">{t(error)}</p>}

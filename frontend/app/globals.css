@@ -163,10 +163,15 @@ input,textarea,select { color: var(--ink); border: 1px solid #d4dee5; border-rad
 @media (max-width:1100px) { .summary-columns { grid-template-columns: 1fr; } .summary-terms dl { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; } .summary-terms dl > div { min-width: 0; } }
 @media (max-width:760px) { .summary-setup .scope-bar { grid-template-columns: 1fr; } .summary-title { flex-direction: column; gap: 10px; } .summary-title h2 { font-size: 20px; } .summary-section,.revision-points { padding: 22px 19px; } .summary-section li p,.revision-points li p { font-size: 13px; } .summary-terms dl { grid-template-columns: 1fr; gap: 0; } }
 
-.summary-content { border: 0; padding: 0; margin: 22px 0 12px; display: flex; flex-wrap: wrap; gap: 10px 20px; }
-.summary-content legend { font-size: 13px; margin-bottom: 12px; }
-.summary-content label { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
-.summary-content input { width: 17px; height: 17px; margin: 0; accent-color: #285e6b; }
+.summary-length { border:0; padding:0; margin:0; min-width:0; }
+.summary-length legend { font-size:13px; margin-bottom:10px; }
+.summary-length-bar { display:flex; padding:4px; border:1px solid #cbdde2; border-radius:8px; background:#edf3f5; }
+.summary-length-bar label { position:relative; flex:1; min-width:0; margin:0; cursor:pointer; }
+.summary-length-bar input { position:absolute; opacity:0; width:1px; height:1px; }
+.summary-length-bar span { display:block; text-align:center; padding:10px 8px; border-radius:5px; font-size:13px; color:#426575; }
+.summary-length-bar input:checked + span { background:#285e6b; color:white; }
+.summary-length-bar input:focus-visible + span { outline:2px solid #285e6b; outline-offset:3px; }
+.summary-length:disabled { opacity:.65; }
 .summary-hint { font-size: 12px; color: #617a89; line-height: 1.9; }
 .summary-paragraphs > div + div { margin-top: 22px; }
 .summary-paragraphs p { font-size: 14px; line-height: 2; max-width: 77ch; white-space: pre-line; overflow-wrap: anywhere; }
