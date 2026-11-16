@@ -8,6 +8,21 @@ const note = `ප්‍රභාසංස්ලේෂණය යනු හරි�
 පත්‍රවල පූටිකා මගින් ශාකයට අවශ්‍ය වායු හුවමාරුව සිදු කරයි.
 ශාකයේ මූල පද්ධතිය මගින් පසෙන් ජලය සහ ඛනිජ ලවණ අවශෝෂණය කරයි.`;
 
+const defaultWorkspace = "00000000-0000-0000-0000-000000000001";
+async function open(page: Page, path: string) {
+  await page.goto(path);
+  if (path.startsWith("/chat")) {
+    await expect(page).toHaveURL(/\/workspaces\//);
+    if (!path.includes("document=")) {
+      if ((page.viewportSize()?.width ?? 1440) <= 850) await page.locator(".workspace-mobile-tabs").getByRole("button", {name:"මූලාශ්‍ර",exact:true}).click();
+      const all = page.getByRole("checkbox", {name:"සියලු සූදානම් මූලාශ්‍ර",exact:true});
+      await expect(page.locator(".workspace-source").first()).toBeVisible();
+      await all.check();
+      if ((page.viewportSize()?.width ?? 1440) <= 850) await page.locator(".workspace-mobile-tabs").getByRole("button", {name:"සංවාදය",exact:true}).click();
+    }
+  }
+}
+
 async function noOverflow(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 }
@@ -49,9 +64,8 @@ async function mockMcqProvider(page: Page, documentId: string) {
 test("source workflow and standard MCQ interaction with mocked provider output", async ({ page }, info) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
-  await page.goto("/");
-  await page.getByRole("main").getByRole("link", { name: "ලේඛනයක් එක් කරන්න", exact: true }).first().click();
-  await expect(page).toHaveURL(/\/documents(?:#upload)?$/);
+  await open(page, "/documents");
+  await expect(page).toHaveURL(/tool=documents/);
   const title = `ජීව විද්‍යාව ${info.project.name}`;
   await page.getByPlaceholder("උදා: ප්‍රභාසංස්ලේෂණය").fill(title);
   await page.getByPlaceholder("උදා: විද්‍යාව").fill("විද්‍යාව");
@@ -66,7 +80,7 @@ test("source workflow and standard MCQ interaction with mocked provider output",
   await noOverflow(page);
   await page.screenshot({ path: `../.artifacts/qa/${info.project.name}-library.png`, fullPage: true });
   await card.getByRole("link", { name: "කියවන්න", exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`/documents/${document.id}$`));
+  await expect(page).toHaveURL(new RegExp(`document=${document.id}`));
   await expect(page.locator("article.source-page")).toContainText("හරිතප්‍රද");
   await page.getByRole("link", { name: "මෙම පාඩමෙන් ප්‍රශ්න අහන්න", exact: true }).click();
   await page.getByLabel("ඔබේ ප්‍රශ්නය", { exact: true }).fill("ප්‍රභාසංස්ලේෂණය යනු කුමක්ද?");
@@ -74,7 +88,7 @@ test("source workflow and standard MCQ interaction with mocked provider output",
   await expect(page.getByRole("textbox", { name: "ඔබේ ප්‍රශ්නය", exact: true })).toHaveValue("");
   const exchange = page.locator(".chat-exchange").last();
   await expect(exchange.locator(".answer-bubble")).toContainText("ආහාර නිපදවන");
-  await expect(exchange.locator(".source-link")).toHaveAttribute("href", `/documents/${document.id}?page=1`);
+  await expect(exchange.locator(".source-link")).toHaveAttribute("href", `/workspaces/${defaultWorkspace}?tool=reader&document=${document.id}&page=1`);
   await noOverflow(page);
   await page.screenshot({ path: `../.artifacts/qa/${info.project.name}-chat.png`, fullPage: true });
   await exchange.locator(".source-link").click();
@@ -86,7 +100,7 @@ test("source workflow and standard MCQ interaction with mocked provider output",
   await expect(page.getByRole("textbox", { name: "ඔබේ ප්‍රශ්නය", exact: true })).toHaveValue("");
   await expect(page.locator(".chat-exchange").last().locator(".answer-bubble")).toContainText("ගැළපීමක් නැත");
   await mockMcqProvider(page, document.id);
-  await page.goto(`/practice?document=${document.id}`);
+  await open(page, `/practice?document=${document.id}`);
   await page.getByRole("button", { name: "පුහුණුව අරඹන්න", exact: true }).click();
   await expect(page.locator(".quiz-question")).toHaveCount(5);
   await expect(page.locator(".quiz-prompt").first()).not.toContainText("_");
@@ -102,7 +116,7 @@ test("source workflow and standard MCQ interaction with mocked provider output",
 });
 
 test("pasted notes, failed upload recovery, filters, and confirmed removal", async ({ page }, info) => {
-  await page.goto("/documents");
+  await open(page, "/documents");
   await page.getByLabel("ගොනු තෝරන්න", { exact: true }).setInputFiles({ name: "bad.exe", mimeType: "application/octet-stream", buffer: Buffer.from("invalid") });
   await expect(page.getByRole("main").getByRole("alert")).toContainText("සහාය නොදක්වන");
   await page.getByLabel("ගොනු තෝරන්න", { exact: true }).setInputFiles({ name: "broken.pdf", mimeType: "application/pdf", buffer: Buffer.from("invalid pdf") });
@@ -132,7 +146,7 @@ test("pasted notes, failed upload recovery, filters, and confirmed removal", asy
 });
 
 test("unavailable API keeps the question and permits retry", async ({ page }) => {
-  await page.goto("/chat");
+  await open(page, "/chat");
   const question = page.getByRole("textbox", { name: "ඔබේ ප්‍රශ්නය", exact: true });
   await expect(question).toBeEnabled();
   await page.route("**/chat", route => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ detail: "සේවාව තාවකාලිකව නොමැත." }) }));
@@ -156,7 +170,7 @@ test("dictation remains editable and never sends automatically", async ({ page }
     }
     Object.defineProperty(window, "SpeechRecognition", { value: TestRecognition });
   });
-  await page.goto("/chat");
+  await open(page, "/chat");
   const question = page.getByRole("textbox", { name: "ඔබේ ප්‍රශ්නය", exact: true });
   await expect(question).toBeEnabled();
   const count = await page.locator(".chat-exchange").count();
@@ -171,7 +185,7 @@ test("late history responses preserve a newly answered question", async ({ page 
   const delayed = new Promise<void>(resolve => { release = resolve; });
   await page.route("**/chats", async route => { await delayed; await route.fulfill({ status: 200, contentType: "application/json", body: "[]" }); });
   try {
-    await page.goto("/chat");
+    await open(page, "/chat");
     const question = page.getByRole("textbox", { name: "ඔබේ ප්‍රශ්නය", exact: true });
     await expect(question).toBeEnabled();
     await question.fill("හරිතප්‍රද යනු කුමක්ද?");
@@ -186,15 +200,13 @@ test("late history responses preserve a newly answered question", async ({ page 
 
 test("legacy links reach real tools and narrow screens do not overflow", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
-  await page.goto("/#practice");
-  await expect(page).toHaveURL(/\/practice$/);
+  await open(page, "/practice");
+  await expect(page).toHaveURL(/tool=practice/);
   await noOverflow(page);
-  await page.getByRole("button", { name: "මෙනුව විවෘත කරන්න", exact: true }).click();
-  await page.getByRole("navigation", { name: "ප්‍රධාන මෙනුව" }).getByRole("link", { name: "මගේ ලේඛන", exact: true }).click();
-  await expect(page).toHaveURL(/\/documents(?:#upload)?$/);
+  await open(page, "/documents");
+  await expect(page).toHaveURL(/tool=documents/);
   await noOverflow(page);
-  await page.getByRole("button", { name: "මෙනුව විවෘත කරන්න", exact: true }).click();
-  await page.getByRole("navigation", { name: "ප්‍රධාන මෙනුව" }).getByRole("link", { name: "සංවාදය", exact: true }).click();
+  await open(page, "/chat");
   await noOverflow(page);
 });
 
@@ -242,7 +254,7 @@ test("original PDF pages, extracted text, citations and reprocessing", async ({ 
   expect(uploaded.status()).toBe(202);
   const { id } = await uploaded.json();
   await expect.poll(async () => (await (await request.get(`http://localhost:8001/documents/${id}`)).json()).status).toBe("ready");
-  await page.goto(`/documents/${id}?page=2`);
+  await open(page, `/documents/${id}?page=2`);
   const image = page.getByRole("img", { name: "reader · පිටුව 2", exact: true });
   await expect(image).toBeVisible();
   await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(600);
@@ -258,8 +270,8 @@ test("original PDF pages, extracted text, citations and reprocessing", async ({ 
   const broken = page.waitForResponse(response => response.url().endsWith("/pages/1/image"));
   await page.route(`**/documents/${id}/pages/1/image`, route => route.fulfill({ status: 503, body: "unavailable" }));
   // Force a fresh document mount so the error and retry path runs even if cached.
-  await page.goto("/documents");
-  await page.goto(`/documents/${id}`);
+  await open(page, "/documents");
+  await open(page, `/documents/${id}`);
   await broken;
   await expect(page.getByRole("main").getByRole("alert")).toContainText("PDF පිටුව පූරණය කළ නොහැක");
   await page.unroute(`**/documents/${id}/pages/1/image`);
@@ -271,7 +283,7 @@ test("Singlish preview stays editable and retrieves a Sinhala cited answer", asy
   const uploaded = await request.post("http://localhost:8001/documents/text", { data: { title: "ජීව පටක", content: "ජීව පටක යනු සමාන කෘත්‍යයක් ඉටු කරන සෛල සමූහයකි. ශාක පටක වර්ග කිහිපයකින් සමන්විත වේ." } });
   const { id } = await uploaded.json();
   await expect.poll(async () => (await (await request.get(`http://localhost:8001/documents/${id}`)).json()).status).toBe("ready");
-  await page.goto(`/chat?document=${id}`);
+  await open(page, `/chat?document=${id}`);
   const question = page.getByRole("textbox", { name: "ඔබේ ප්‍රශ්නය", exact: true });
   await expect(question).toBeEnabled();
   await expect(page.getByText("පෙර ප්‍රශ්න ලබාගනිමින්…", { exact: true })).toHaveCount(0);
@@ -291,7 +303,7 @@ test("Singlish preview stays editable and retrieves a Sinhala cited answer", asy
   const exchange = page.locator(".chat-exchange").last();
   await expect(exchange).toContainText("මොකක්ද ජීව පටක කියන්නේ");
   await expect(exchange.locator(".answer-bubble")).toContainText("සෛල සමූහයකි");
-  await expect(exchange.locator(".source-link")).toHaveAttribute("href", `/documents/${id}?page=1`);
+  await expect(exchange.locator(".source-link")).toHaveAttribute("href", `/workspaces/${defaultWorkspace}?tool=reader&document=${id}&page=1`);
   await noOverflow(page);
   await page.screenshot({ path: `../.artifacts/qa/${info.project.name}-singlish.png`, fullPage: true });
   await page.reload();
@@ -303,18 +315,18 @@ test("English and Sinhala switch across all tools and preserve original notes", 
   const response = await request.post("http://localhost:8001/documents/text", { data: { title: "Language test note", content: note } });
   const { id } = await response.json();
   await expect.poll(async () => (await (await request.get(`http://localhost:8001/documents/${id}`)).json()).status).toBe("ready");
-  await page.goto("/documents");
-  await page.getByRole("combobox", { name: "Interface language" }).selectOption("en");
+  await open(page, "/documents");
+  await page.getByRole("combobox", { name: /Interface language|අතුරුමුහුණත් භාෂාව/ }).selectOption("en");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sources");
   await expect(page.getByRole("button", { name: "Upload file", exact: true })).toBeVisible();
   await expect(page.getByRole("searchbox", { name: "Search sources", exact: true })).toBeVisible();
-  await page.goto(`/documents/${id}`);
+  await open(page, `/documents/${id}`);
   await expect(page.getByRole("link", { name: "Ask about this source", exact: true })).toBeVisible();
   await expect(page.locator("article.source-page")).toContainText("ප්‍රභාසංස්ලේෂණය");
-  await page.goto(`/practice?document=${id}`);
+  await open(page, `/practice?document=${id}`);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Practice");
   await expect(page.getByRole("button", { name: "Start practice", exact: true })).toBeVisible();
-  await page.goto(`/chat?document=${id}`);
+  await open(page, `/chat?document=${id}`);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Ask your notes");
   await expect(page.getByRole("textbox", { name: "Your question", exact: true })).toBeVisible();
   await page.reload();
@@ -322,7 +334,7 @@ test("English and Sinhala switch across all tools and preserve original notes", 
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Ask your notes");
   await noOverflow(page);
   await page.screenshot({ path: `../.artifacts/qa/${info.project.name}-workspace-en.png` });
-  await page.getByRole("combobox", { name: "Interface language" }).selectOption("si");
+  await page.getByRole("combobox", { name: /Interface language|අතුරුමුහුණත් භාෂාව/ }).selectOption("si");
   await expect(page.locator("html")).toHaveAttribute("lang", "si");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("සංවාදය");
 });
@@ -331,7 +343,7 @@ test("informal Singlish function question finds scoped notes with the composer v
   const response = await request.post("http://localhost:8001/documents/text", { data: { title: `රුධිර පටක ${info.project.name}`, content: "රුධිර පටකයේ කාර්යයන් වන්නේ ඔක්සිජන් හා පෝෂක ද්‍රව්‍ය ප්‍රවාහනය කිරීමයි. ශ්වසනය සෛල තුළ ශක්තිය නිදහස් කරන ක්‍රියාවලියකි." } });
   const { id } = await response.json();
   await expect.poll(async () => (await (await request.get(`http://localhost:8001/documents/${id}`)).json()).status).toBe("ready");
-  await page.goto(`/chat?document=${id}`);
+  await open(page, `/chat?document=${id}`);
   const question = page.getByRole("textbox", { name: "ඔබේ ප්‍රශ්නය", exact: true });
   await expect(question).toBeEnabled();
   await question.fill("rudira patakaye karyan mnd");
@@ -339,30 +351,26 @@ test("informal Singlish function question finds scoped notes with the composer v
   await expect(question).toHaveValue("");
   const exchange = page.locator(".chat-exchange").last();
   await expect(exchange.locator(".answer-content")).toContainText("ඔක්සිජන්");
-  await expect(exchange.locator(".source-link")).toHaveAttribute("href", `/documents/${id}?page=1`);
+  await expect(exchange.locator(".source-link")).toHaveAttribute("href", `/workspaces/${defaultWorkspace}?tool=reader&document=${id}&page=1`);
   const box = await question.boundingBox();
   expect(box).not.toBeNull();
   expect(box!.y + box!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
   await noOverflow(page);
   await page.screenshot({ path: `../.artifacts/qa/${info.project.name}-informal-singlish.png` });
   if (info.project.name === "desktop") {
-    await page.getByRole("button", { name: "පැති තීරුව හකුළන්න", exact: true }).click();
-    await expect(page.locator(".workspace")).toHaveClass(/sidebar-collapsed/);
-    await page.reload();
-    await expect(page.locator(".workspace")).toHaveClass(/sidebar-collapsed/);
-    await page.getByRole("button", { name: "පැති තීරුව විවෘත කරන්න", exact: true }).click();
+    await page.locator(".panel-toggles").getByRole("button", {name:"මූලාශ්‍ර",exact:true}).click();
+    await expect(page.locator(".study-workspace")).toHaveClass(/sources-collapsed/);
   } else {
-    await page.getByRole("button", { name: "මෙනුව විවෘත කරන්න", exact: true }).click();
-    await expect(page.getByRole("navigation", { name: "ප්‍රධාන මෙනුව" })).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("navigation", { name: "ප්‍රධාන මෙනුව" })).not.toBeVisible();
+    await page.locator(".workspace-mobile-tabs").getByRole("button", {name:"Studio",exact:true}).click();
+    await expect(page.locator(".workspace-studio")).toBeVisible();
+    await page.locator(".workspace-mobile-tabs").getByRole("button", {name:"සංවාදය",exact:true}).click();
   }
 });
 
 
 test("quiz generation failure stays actionable and never shows missing-word fallback", async ({ page }) => {
-  await page.goto("/practice");
-  await page.getByRole("combobox", { name: "Interface language" }).selectOption("en");
+  await open(page, "/practice");
+  await page.getByRole("combobox", { name: /Interface language|අතුරුමුහුණත් භාෂාව/ }).selectOption("en");
   await page.route("**/quizzes", route => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ detail: "Question generation is unavailable. Please try again shortly." }) }));
   await page.getByRole("button", { name: "Start practice", exact: true }).click();
   await expect(page.getByRole("main").getByRole("alert")).toContainText("Question generation is unavailable");
@@ -375,8 +383,8 @@ test("quiz generation failure stays actionable and never shows missing-word fall
 test("new answers reveal gradually and can be shown immediately", async ({ page }) => {
   const text = "Plants absorb light through chlorophyll. Light provides energy for photosynthesis and food production in green leaves. ".repeat(14);
   let counter = 0;
-  await page.route("http://localhost:8000/chat", route => route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: `animated-${counter++}`, question: "test question", normalized_question: "test question", answer: text, sources: [], mode: "extractive", created_at: new Date().toISOString() }) }));
-  await page.goto("/chat");
+  await page.route("http://localhost:8000/**/chat", route => route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: `animated-${counter++}`, question: "test question", normalized_question: "test question", answer: text, sources: [], mode: "extractive", created_at: new Date().toISOString() }) }));
+  await open(page, "/chat");
   const question = page.getByRole("textbox", { name: "ඔබේ ප්‍රශ්නය", exact: true });
   await expect(question).toBeEnabled();
   await question.fill("test question");
@@ -408,16 +416,22 @@ test("focused summary shows key points, terms, revision and source citations", a
     expect(body.length).toBe("long");
     expect(body.provider).toBe("kimi");
     expect(body.include).toContain("comparisons");
-    expect(body.include).not.toContain("examples");
+    expect(body.include).toContain("examples");
     saved = { document_id: id, title: "Photosynthesis essentials", language: body.language, focus: body.focus, sections: [{ heading: "ශක්තිය සහ ආහාර", points: [point, point] }, { heading: "පත්‍ර", points: [point, point] }], key_terms: [{ term: "හරිතප්‍රද", ...point }, { term: "ප්‍රභාසංස්ලේෂණය", ...point }], revision_points: [point, point], coverage: { included_pages: 1, total_pages: 1, text_truncated: false }, mode: "gemini", generated_at: new Date().toISOString() };
     return route.fulfill({ contentType: "application/json", body: JSON.stringify(saved) });
   });
-  await page.goto(`/summaries?document=${id}`);
-  await page.getByRole("combobox", { name: "Interface language" }).selectOption("en");
+  await open(page, `/summaries?document=${id}`);
+  await page.getByRole("combobox", { name: /Interface language|අතුරුමුහුණත් භාෂාව/ }).selectOption("en");
   await page.getByRole("textbox", { name: "Focus on", exact: true }).fill("functions and definitions");
-  await page.getByRole("combobox", { name: "Paragraph length" }).selectOption("long");
+  await expect(page.getByText("Include in the summary", { exact: true })).toHaveCount(0);
+  await page.getByRole("radio", { name: "Short", exact: true }).focus();
+  await page.keyboard.press("Space");
+  await expect(page.getByRole("radio", { name: "Short", exact: true })).toBeChecked();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("radio", { name: "Medium", exact: true })).toBeChecked();
+  await page.getByRole("radio", { name: "Detailed", exact: true }).check();
+  await expect(page.getByRole("radio", { name: "Detailed", exact: true })).toBeChecked();
   await page.getByRole("combobox", { name: "Summary provider" }).selectOption("kimi");
-  await page.getByRole("checkbox", { name: "Examples", exact: true }).uncheck();
   await page.getByRole("button", { name: "Summarize", exact: true }).click();
   await expect(page.getByRole("region", { name: "Study summary", exact: true })).toBeVisible();
   await expect(page.locator(".summary-section")).toHaveCount(2);
@@ -425,9 +439,9 @@ test("focused summary shows key points, terms, revision and source citations", a
   await expect(page.locator(".summary-section li")).toHaveCount(0);
   await expect(page.locator(".summary-terms dt")).toHaveCount(2);
   await expect(page.locator(".revision-points li")).toHaveCount(2);
-  await expect(page.locator(".summary-section .source-link").first()).toHaveAttribute("href", `/documents/${id}?page=1`);
+  await expect(page.locator(".summary-section .source-link").first()).toHaveAttribute("href", `/workspaces/${defaultWorkspace}?tool=reader&document=${id}&page=1`);
   await noOverflow(page);
   await page.screenshot({ path: `../.artifacts/qa/${info.project.name}-summary.png`, fullPage: true });
-  await page.getByRole("combobox", { name: "Interface language" }).selectOption("si");
+  await page.getByRole("combobox", { name: /Interface language|අතුරුමුහුණත් භාෂාව/ }).selectOption("si");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("සාරාංශ");
 });

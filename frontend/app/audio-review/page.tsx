@@ -1,5 +1,3 @@
 import { Suspense } from "react";
-import { SummaryWorkspace } from "@/components/summary-workspace";
-export default function AudioReviewPage() {
-  return <Suspense><SummaryWorkspace audioReview /></Suspense>;
-}
+import { LegacyWorkspaceRedirect } from "@/components/legacy-workspace-redirect";
+export default function Page() { return <Suspense><LegacyWorkspaceRedirect/></Suspense>; }

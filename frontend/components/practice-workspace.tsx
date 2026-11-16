@@ -1,6 +1,6 @@
 "use client";
 import { useLanguage } from "@/lib/language";
-import Link from "next/link";
+import Link from "@/components/scoped-link";
 import { useEffect, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, type Quiz, type QuizResult } from "@/lib/api";
@@ -13,6 +13,7 @@ export function PracticeWorkspace() {
     const { documents, loading, error: documentsError } = useDocuments();
     const [selected, setSelected] = useState(params.get("document") ?? "");
     const [subject, setSubject] = useState("");
+    const [questionCount, setQuestionCount] = useState(5);
     const [quizLanguage, setQuizLanguage] = useState<"si" | "en">(interfaceLanguage);
     useEffect(() => setQuizLanguage(interfaceLanguage), [interfaceLanguage]);
     const [quiz, setQuiz] = useState<Quiz | null>(null);
@@ -20,6 +21,12 @@ export function PracticeWorkspace() {
     const [result, setResult] = useState<QuizResult | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
+    useEffect(() => {
+      const saved = params.get("quiz"); if (!saved) return;
+      const controller = new AbortController();
+      api<Quiz & { result: QuizResult | null }>(`/quizzes/${saved}`, { signal: controller.signal }).then(value => { setQuiz(value); setAnswers(value.result?.questions.map(q => q.selected_index) ?? value.questions.map(() => -1)); setResult(value.result); }).catch(e => { if (!controller.signal.aborted) setError(e.message); });
+      return () => controller.abort();
+    }, [params]);
     const ready = documents.filter(d => d.status === "ready");
     const subjects = [...new Set(ready.map(d => d.subject))].sort();
     const validSelected = ready.some(d => d.id === selected) ? selected : "";
@@ -29,7 +36,7 @@ export function PracticeWorkspace() {
         setError("");
         try {
             setQuiz(null); setResult(null);
-            const next = await api<Quiz>("/quizzes", { method: "POST", signal: AbortSignal.timeout(120_000), body: JSON.stringify({ subject: subject || null, document_id: validSelected || null, count: 5, language: quizLanguage }) });
+            const next = await api<Quiz>("/quizzes", { method: "POST", signal: AbortSignal.timeout(120_000), body: JSON.stringify({ subject: subject || null, document_id: validSelected || null, count: questionCount, language: quizLanguage }) });
             setQuiz(next);
             setAnswers(next.questions.map(() => -1));
             setResult(null);
@@ -59,7 +66,7 @@ export function PracticeWorkspace() {
     }
     return <div className="overview tool-page practice-page"><div className="page-intro"><h1>{t("පුහුණුව", "Practice")}</h1><p>{t("11 ශ්‍රේණිය සඳහා බහුවරණ ප්‍රශ්න.", "Grade 11 multiple-choice practice.")}</p></div>
     {documentsError && <p className="notice error" role="alert">{documentsError}</p>}
-    {!loading && ready.length === 0 ? <div className="empty-state tool-card"><Icon name="quiz" size={36}/><h2>{t("පුහුණුව සඳහා පාඩමක් එක් කරන්න")}</h2><p>{t("සම්පූර්ණ වාක්‍ය සහිත සටහනක් එක් කර එය සූදානම් වන තෙක් රැඳී සිටින්න.")}</p><Link href="/documents" className="primary-button">{t("ලේඛනයක් එක් කරන්න")}</Link></div> : <section className="tool-card practice-setup" aria-label={t("පුහුණුව සකසන්න")}><div className="scope-bar"><label>{t("විෂය")}<select value={subject} onChange={e => { setSubject(e.target.value); setSelected(""); setQuiz(null); setResult(null); }} disabled={busy}><option value="">{t("සියලු විෂයන්")}</option>{subjects.map(s => <option key={s}>{s}</option>)}</select></label><label>{t("ලේඛනය")}<select value={validSelected} onChange={e => { setSelected(e.target.value); setQuiz(null); setResult(null); }} disabled={busy}><option value="">{t("සියලු සූදානම් ලේඛන")}</option>{ready.filter(d => !subject || d.subject === subject).map(d => <option key={d.id} value={d.id}>{d.title}</option>)}</select></label><label>{t("ප්‍රශ්න භාෂාව", "Question language")}<select aria-label={t("ප්‍රශ්න භාෂාව", "Question language")} value={quizLanguage} disabled={busy} onChange={e => setQuizLanguage(e.target.value as "si" | "en")}><option value="si">සිංහල</option><option value="en">English</option></select></label></div><div className="form-actions"><p>{t("ප්‍රශ්න 5 · පිළිතුරු 4 · පාඩම ඇසුරින්", "5 questions · 4 options · Based on your sources")}</p><button className="primary-button" onClick={() => void create()} disabled={busy || !ready.length}>{busy && !quiz ? t("ප්‍රශ්න සකසමින්…") : quiz ? t("අලුත් පුහුණුවක්") : t("පුහුණුව අරඹන්න")}<Icon name="arrow" size={17}/></button></div></section>}
+    {!loading && ready.length === 0 ? <div className="empty-state tool-card"><Icon name="quiz" size={36}/><h2>{t("පුහුණුව සඳහා පාඩමක් එක් කරන්න")}</h2><p>{t("සම්පූර්ණ වාක්‍ය සහිත සටහනක් එක් කර එය සූදානම් වන තෙක් රැඳී සිටින්න.")}</p><Link href="/documents" className="primary-button">{t("ලේඛනයක් එක් කරන්න")}</Link></div> : <section className="tool-card practice-setup" aria-label={t("පුහුණුව සකසන්න")}><div className="scope-bar"><label>{t("විෂය")}<select value={subject} onChange={e => { setSubject(e.target.value); setSelected(""); setQuiz(null); setResult(null); }} disabled={busy}><option value="">{t("සියලු විෂයන්")}</option>{subjects.map(s => <option key={s}>{s}</option>)}</select></label><label>{t("ලේඛනය")}<select value={validSelected} onChange={e => { setSelected(e.target.value); setQuiz(null); setResult(null); }} disabled={busy}><option value="">{t("සියලු සූදානම් ලේඛන")}</option>{ready.filter(d => !subject || d.subject === subject).map(d => <option key={d.id} value={d.id}>{d.title}</option>)}</select></label><label>{t("ප්‍රශ්න භාෂාව", "Question language")}<select aria-label={t("ප්‍රශ්න භාෂාව", "Question language")} value={quizLanguage} disabled={busy} onChange={e => setQuizLanguage(e.target.value as "si" | "en")}><option value="si">සිංහල</option><option value="en">English</option></select></label><label>{t("ප්‍රශ්න ගණන", "Number of questions")}<select value={questionCount} disabled={busy} onChange={e => setQuestionCount(Number(e.target.value))}>{Array.from({ length: 10 }, (_, index) => index + 1).map(count => <option key={count} value={count}>{count}</option>)}</select></label></div><div className="form-actions"><p>{t(`ප්‍රශ්න ${questionCount} · පිළිතුරු 4 · පාඩම ඇසුරින්`, `${questionCount} ${questionCount === 1 ? "question" : "questions"} · 4 options · Based on your sources`)}</p><button className="primary-button" onClick={() => void create()} disabled={busy || !ready.length}>{busy && !quiz ? t("ප්‍රශ්න සකසමින්…") : quiz ? t("අලුත් පුහුණුවක්") : t("පුහුණුව අරඹන්න")}<Icon name="arrow" size={17}/></button></div></section>}
     {error && <p className="notice error" role="alert">{t(error)}</p>}{busy && !result && <p className="quiz-generation" role="status">{t("ප්‍රශ්න පරීක්ෂා කරමින්… නොගැළපෙන ප්‍රශ්න ස්වයංක්‍රීයව නැවත සකසයි.", "Writing and checking questions. Any rejected items are replaced automatically…")}</p>}
     {quiz && <form className="quiz-form" onSubmit={submit}>
       {result && <div className="quiz-score" role="status"><Icon name="check" size={28}/><div><h2>{t("ඔබේ ලකුණු:", "Your score:")} {result.score} / {result.total}</h2><p>{t("පහතින් නිවැරදි පිළිතුරු සහ මූලාශ්‍ර කියවා බලන්න.")}</p></div></div>}

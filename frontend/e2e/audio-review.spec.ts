@@ -39,11 +39,11 @@ for (const language of ["en", "si"] as const) {
         if (route.request().method() === "POST") { calls++; audioSaved = true; return route.fulfill({ json: review }); }
         return route.fulfill({ json: { audio: audioSaved ? review : null } });
       }
-      if (url.pathname === review.url) return route.fulfill({ body: wav(), contentType: "audio/wav", headers: url.searchParams.has("download") ? { "Content-Disposition": "attachment; filename=review.wav" } : {} });
+      if (url.pathname.endsWith(review.url)) return route.fulfill({ body: wav(), contentType: "audio/wav", headers: url.searchParams.has("download") ? { "Content-Disposition": "attachment; filename=review.wav" } : {} });
       return route.fulfill({ response: await route.fetch({ url: `http://localhost:8001${url.pathname}${url.search}` }) });
     });
     await page.goto(`/audio-review?document=${documentId}`);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText(language === "si" ? "හඬ සමාලෝචනය" : "Audio Review");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(language === "si" ? "හඬ සමාලෝචනය" : "Audio Overview");
     await page.getByRole("button", { name: language === "si" ? "කියවන සාරාංශය සකසන්න" : "Prepare review script", exact: true }).click();
     const create = page.getByRole("button", { name: language === "si" ? "හඬ සමාලෝචනය සාදන්න" : "Create audio review", exact: true });
     await expect(create).toBeEnabled();

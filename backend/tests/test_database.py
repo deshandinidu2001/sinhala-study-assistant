@@ -89,7 +89,17 @@ def test_migrations_round_trip_in_disposable_database(
     try:
         monkeypatch.setenv("DATABASE_URL", temporary.url.render_as_string(hide_password=False))
         get_settings.cache_clear()
+        command.upgrade(config, "0003_chat_metadata")
+        legacy_id = uuid4()
+        with temporary.begin() as connection:
+            connection.execute(text("INSERT INTO documents(id,title,subject,filename) VALUES (:id,'Legacy note','Science','original.pdf')"), {"id": legacy_id})
+            connection.execute(text("INSERT INTO chats(id,question,answer,sources) VALUES (:id,'Legacy question','Saved answer',:sources)"), {"id": uuid4(), "sources": '[]'})
+            connection.execute(text("INSERT INTO quizzes(id,subject,questions) VALUES (:id,'Legacy quiz',:questions)"), {"id": uuid4(), "questions": '[]'})
         command.upgrade(config, "head")
+        with temporary.connect() as connection:
+            for table in ("documents", "chats", "quizzes"):
+                assert str(connection.execute(text(f"SELECT workspace_id FROM {table}")).scalar_one()) == "00000000-0000-0000-0000-000000000001"
+            assert connection.execute(text("SELECT filename FROM documents WHERE id=:id"), {"id": legacy_id}).scalar_one() == "original.pdf"
         command.check(config)
         assert {"documents", "chunks", "chats", "quizzes"} <= set(inspect(temporary).get_table_names())
         command.downgrade(config, "base")

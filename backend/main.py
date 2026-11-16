@@ -68,6 +68,9 @@ def create_app() -> FastAPI:
         CORSMiddleware, allow_origins=settings.cors_origins,
         allow_methods=["GET", "POST", "DELETE"], allow_headers=["Content-Type"],
     )
+    from backend.workspaces import router as workspace_router
+    application.include_router(workspace_router)
+    application.include_router(router, prefix="/workspaces/{workspace_id}")
     application.include_router(router)
 
     @application.exception_handler(RequestValidationError)

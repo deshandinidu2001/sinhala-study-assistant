@@ -10,6 +10,7 @@ export class ApiError extends Error {
 }
 
 export type StudyDocument = {
+  workspace_id?: string;
   id: string; title: string; subject: string; filename: string; page_count: number;
   status: "pending" | "processing" | "ready" | "failed"; file_size: number;
   error: string | null; extraction_method: string | null; uploaded_at: string;
@@ -21,13 +22,17 @@ export type Quiz = { id: string; subject: string; grade?: number; kind?: string;
 export type QuizResult = { score: number; total: number; questions: (QuizQuestion & { answer_index: number; selected_index: number; correct: boolean; explanation: string; option_explanations?: string[]; evidence_quote?: string; source: Source })[] };
 export type SummaryPoint = { text: string; source: Source };
 export type AudioReview = { id: string; document_id: string; language: string; text: string; duration_seconds: number; generated_at: string; url: string };
-export type DocumentSummary = { document_id: string; title: string; language: string; focus: string; mode: "gemini" | "kimi"; generated_at: string;
+export type DocumentSummary = { options?: { length: string; include: string[]; provider: string }; document_id: string; title: string; language: string; focus: string; mode: "gemini" | "kimi"; generated_at: string;
   sections: { heading: string; points: SummaryPoint[] }[]; key_terms: (SummaryPoint & { term: string })[]; revision_points: SummaryPoint[];
   coverage: { included_pages: number; total_pages: number; text_truncated: boolean };
 };
 export type DocumentDetail = StudyDocument & { pages: { page: number; text: string; ocr: boolean }[] };
 
 export function apiUrl(path: string): string {
+  if (typeof window !== "undefined" && !path.startsWith("/workspaces") && path !== "/health") {
+    const match = window.location.pathname.match(/^\/workspaces\/([^/]+)/);
+    if (match) path = `/workspaces/${match[1]}${path}`;
+  }
   return `${(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "")}${path}`;
 }
 

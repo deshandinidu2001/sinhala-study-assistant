@@ -19,7 +19,7 @@ from backend.summaries import make_summary, cached_summary, SUMMARY_NO_KEY, SUMM
 from backend.quizzes import make_mcq_quiz, NO_KEY, UNAVAILABLE
 from backend.pdf_pages import render_page
 from backend.config import get_settings
-from backend.db.models import Chat, Chunk, Document, Quiz
+from backend.db.models import Chat, Chunk, Document, Quiz, DEFAULT_WORKSPACE, Workspace
 from backend.db.session import get_db
 from backend.study import EXTENSIONS, StudyError, document_folder, ingest, normalize, retrieve, source_path, words
 
@@ -29,7 +29,7 @@ DB = Annotated[Session, Depends(get_db)]
 
 def document_data(document: Document) -> dict:
     return {"id": str(document.id), "title": document.title, "subject": document.subject,
-            "filename": document.filename, "page_count": document.page_count,
+            "workspace_id": str(document.workspace_id), "filename": document.filename, "page_count": document.page_count,
             "status": document.status, "file_size": document.file_size, "error": document.error,
             "extraction_method": document.extraction_method, "uploaded_at": document.uploaded_at.isoformat()}
 
@@ -60,7 +60,7 @@ def save_document(db: Session, request: Request, filename: str, content: bytes, 
     subject = normalize(subject) or "සාමාන්‍ය"
     if len(title) > 255 or len(subject) > 120:
         raise HTTPException(422, "ලේඛන නම අකුරු 255 සහ විෂය අකුරු 120 නොඉක්මවිය යුතුය.")
-    document = Document(id=uuid4(), title=title, subject=subject, filename=filename, file_size=len(content), status="pending")
+    document = Document(workspace_id=db.info.get("workspace_id", DEFAULT_WORKSPACE), id=uuid4(), title=title, subject=subject, filename=filename, file_size=len(content), status="pending")
     folder = document_folder(document.id)
     folder.mkdir(parents=True, exist_ok=False)
     try:
@@ -180,6 +180,7 @@ class QuestionInput(BaseModel):
     question: str = Field(min_length=2, max_length=2000)
     subject: str | None = Field(default=None, max_length=120)
     document_id: UUID | None = None
+    document_ids: list[UUID] | None = Field(default=None, max_length=200)
 
     @field_validator("question")
     @classmethod
@@ -201,11 +202,22 @@ def chat_data(chat: Chat) -> dict:
 
 
 def question_vocabulary(db: Session, body: QuestionInput) -> set[str]:
+    if body.document_id:
+        require_document(db, body.document_id)
+    if body.document_ids is not None:
+        if not body.document_ids:
+            raise HTTPException(422, "Select at least one ready source")
+        for identity in body.document_ids:
+            item = require_document(db, identity)
+            if item.status != "ready":
+                raise HTTPException(409, "Source is not ready")
     query = select(Chunk.text).join(Document).where(Document.status == "ready")
     if body.document_id:
         query = query.where(Document.id == body.document_id)
     if body.subject:
         query = query.where(Document.subject == body.subject)
+    if body.document_ids is not None:
+        query = query.where(Document.id.in_(body.document_ids))
     vocabulary = set()
     for content in db.scalars(query.order_by(Chunk.document_id, Chunk.page, Chunk.chunk_index).limit(500)):
         vocabulary.update(words(content))
@@ -236,7 +248,7 @@ def ask_question(body: QuestionInput, db: DB) -> dict:
     if body.document_id:
         require_document(db, body.document_id)
     question, normalization, notice = gemini.interpret(body.question, body.language, question_vocabulary(db, body))
-    sources = retrieve(db, question, body.subject, body.document_id)
+    sources = retrieve(db, question, body.subject, body.document_id, body.document_ids)
     if sources:
         answer = ("Relevant passages from your sources:\n\n" if body.answer_language == "en" else "ඔබේ ලේඛනවලින් හමු වූ අදාළ කොටස්:\n\n") + "\n\n".join(f"{source['excerpt']} [{i}]" for i, source in enumerate(sources, 1))
     else:
@@ -253,7 +265,7 @@ def ask_question(body: QuestionInput, db: DB) -> dict:
                 notice = "Gemini පිළිතුර මූලාශ්‍රවලින් තහවුරු කළ නොහැකි නිසා අදාළ කොටස් උපුටා පෙන්වයි."
         except gemini.GeminiUnavailable:
             notice = gemini.FALLBACK_NOTICE
-    chat = Chat(question=body.question, answer=answer, sources=sources, subject=body.subject, details={"document_id": str(body.document_id) if body.document_id else None, "normalized_question": question, "normalization": normalization, "mode": mode, "notice": notice})
+    chat = Chat(workspace_id=db.info.get("workspace_id", DEFAULT_WORKSPACE), question=body.question, answer=answer, sources=sources, subject=body.subject, details={"document_id": str(body.document_id) if body.document_id else None, "normalized_question": question, "normalization": normalization, "mode": mode, "notice": notice})
     db.add(chat)
     db.commit()
     db.refresh(chat)
@@ -358,7 +370,7 @@ def create_quiz(body: QuizInput, db: DB) -> dict:
         raise HTTPException(422, str(error))
     except gemini.GeminiUnavailable as error:
         raise HTTPException(503, NO_KEY if str(error) == NO_KEY else UNAVAILABLE)
-    quiz = Quiz(subject=body.subject or "සියලු විෂයන්", questions=questions)
+    quiz = Quiz(workspace_id=db.info.get("workspace_id", DEFAULT_WORKSPACE), subject=body.subject or "සියලු විෂයන්", questions=questions)
     db.add(quiz)
     db.commit()
     db.refresh(quiz)
@@ -377,4 +389,61 @@ def grade_quiz(quiz_id: UUID, body: QuizSubmission, db: DB) -> dict:
     if len(body.answers) != len(quiz.questions) or any(a < 0 or a >= len(q["options"]) for a, q in zip(body.answers, quiz.questions)):
         raise HTTPException(422, "සෑම ප්‍රශ්නයකටම වලංගු පිළිතුරක් තෝරන්න.")
     results = [{**q, "selected_index": a, "correct": a == q["answer_index"]} for a, q in zip(body.answers, quiz.questions)]
-    return {"score": sum(q["correct"] for q in results), "total": len(results), "questions": results}
+    result = {"score": sum(q["correct"] for q in results), "total": len(results), "questions": results}
+    quiz.result = result
+    db.commit()
+    return result
+
+
+@router.get("/quizzes/{quiz_id}")
+def get_quiz(quiz_id: UUID, db: DB) -> dict:
+    quiz = db.get(Quiz, quiz_id)
+    if quiz is None:
+        raise HTTPException(404, "Quiz not found")
+    return {**quiz_data(quiz), "result": quiz.result}
+
+
+@router.get("/studio")
+def studio_outputs(db: DB) -> list[dict]:
+    outputs = []
+    for quiz in db.scalars(select(Quiz).order_by(Quiz.created_at.desc())):
+        source = quiz.questions[0].get("source", {}) if quiz.questions else {}
+        outputs.append({"id": str(quiz.id), "type": "quiz", "title": source.get("title") or quiz.subject,
+            "language": quiz.questions[0].get("language", "si") if quiz.questions else "si",
+            "created_at": quiz.created_at.isoformat(), "document_id": source.get("document_id")})
+    for document in db.scalars(select(Document)):
+        for path in document_folder(document.id).glob("audio-*.json"):
+            try:
+                value = json.loads(path.read_text(encoding="utf-8"))
+                if not path.with_suffix(".wav").is_file():
+                    continue
+                outputs.append({"id": value["id"], "type": "audio", "title": document.title,
+                    "language": value["language"], "created_at": value["generated_at"], "document_id": str(document.id)})
+            except (OSError, ValueError, KeyError):
+                continue
+        for path in document_folder(document.id).glob("summary-*.json"):
+            try:
+                value = json.loads(path.read_text(encoding="utf-8"))
+                outputs.append({"id": path.stem, "type": "summary", "title": value["title"],
+                    "language": value["language"], "created_at": value["generated_at"], "document_id": str(document.id)})
+            except (OSError, ValueError, KeyError):
+                continue
+    return sorted(outputs, key=lambda item: item["created_at"], reverse=True)
+
+
+@router.get("/documents/{document_id}/saved-summary/{identity}")
+def saved_summary(document_id: UUID, identity: Annotated[str, ApiPath(pattern=r"^summary-[a-f0-9]{24}$")], db: DB) -> dict:
+    require_document(db, document_id)
+    try:
+        return json.loads((document_folder(document_id) / f"{identity}.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raise HTTPException(404, "Saved summary not found")
+
+
+@router.get("/documents/{document_id}/saved-audio/{identity}")
+def saved_audio(document_id: UUID, identity: Annotated[str, ApiPath(pattern=r"^[a-f0-9]{64}$")], db: DB) -> dict:
+    require_document(db, document_id)
+    try:
+        return json.loads((document_folder(document_id) / f"audio-{identity}.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raise HTTPException(404, "Saved audio not found")

@@ -1,3 +1,3 @@
 import { Suspense } from "react";
-import { PracticeWorkspace } from "@/components/practice-workspace";
-export default function PracticePage() { return <Suspense fallback={<p className="overview">පුහුණුව ලබාගනිමින්…</p>}><PracticeWorkspace /></Suspense>; }
+import { LegacyWorkspaceRedirect } from "@/components/legacy-workspace-redirect";
+export default function Page() { return <Suspense><LegacyWorkspaceRedirect/></Suspense>; }
